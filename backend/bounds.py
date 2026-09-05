@@ -7,7 +7,9 @@ retries, human-approved manual retries, and baseline simulation.
 Deliberately conservative and industry-aligned:
 - Max 4 automatic attempts per transaction (typical RBI/NPCI-adjacent repeated-debit norms).
 - Minimum 5 minutes between attempts.
-- Hard no-retry set: risk/compliance failures never retry automatically.
+- Hard no-retry set: risk/compliance failures never retry AUTOMATICALLY. A single
+  explicit human-approved retry (via the review queue) is the one carved-out
+  exception, capped by MAX_HUMAN_RETRIES_PER_TRANSACTION and audit-logged.
 """
 
 GLOBAL_MAX_AUTOMATIC_ATTEMPTS = 4

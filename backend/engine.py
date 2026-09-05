@@ -38,6 +38,7 @@ _LINK_FLOWS = {"expired_card", "otp_timeout", "network_drop",
                "wrong_cvv_pin", "insufficient_funds"}
 from bounds import (
     GLOBAL_MAX_AUTOMATIC_ATTEMPTS,
+    MAX_HUMAN_RETRIES_PER_TRANSACTION,
     MIN_COOLDOWN_MINUTES_BETWEEN_ATTEMPTS,
     HARD_NO_RETRY_CATEGORIES,
     validate_automatic_retry,
@@ -255,30 +256,35 @@ class ReclaimEngine:
 
     # ---------------------------------------------------------------- review
     def approve_review(self, item_id: str) -> dict:
-        """Human approves one bounded manual retry for a queued item."""
+        """Human approves one bounded retry for a queued item.
+
+        Applies to every queued category — including Risk/Fraud Block, which is
+        never AUTO-retried but may be recovered by a single explicit, audit-logged
+        human-approved attempt (one-time override, still inside the hard caps).
+        """
         item = self._get_review_item(item_id)
         if not item or item["status"] != "pending":
             return {"ok": False, "error": "item not pending"}
 
         txn_id = item["transaction_id"]
-        event = db.get_event(txn_id)
-        classification = db.all_classifications()[txn_id]
-        decision = db.all_decisions()[txn_id]
         sim_now = simclock.now()
 
-        used = len(db.get_attempts(txn_id))
-        if used >= GLOBAL_MAX_AUTOMATIC_ATTEMPTS + 1:
+        attempts = db.get_attempts(txn_id)
+        used = len(attempts)
+        if used >= GLOBAL_MAX_AUTOMATIC_ATTEMPTS + MAX_HUMAN_RETRIES_PER_TRANSACTION:
             db.update_review_item(id=item_id, status="dismissed", decided_at=sim_now.isoformat() + "Z",
                                   decided_by="system", decided_extra_attempts=0)
             return {"ok": False, "error": "attempt cap exceeded; auto-dismissed"}
 
-        if classification["predicted_reason"] in HARD_NO_RETRY_CATEGORIES:
+        human_used = sum(1 for a in attempts if a["source"] == SRC_HUMAN)
+        if human_used >= MAX_HUMAN_RETRIES_PER_TRANSACTION:
             db.update_review_item(id=item_id, status="dismissed", decided_at=sim_now.isoformat() + "Z",
                                   decided_by="system", decided_extra_attempts=0)
-            return {"ok": False, "error": "hard no-retry category; auto-dismissed"}
+            return {"ok": False, "error": "human retry cap reached; auto-dismissed"}
 
         # one human-approved attempt, now
         from datetime import timedelta
+        classification = db.all_classifications()[txn_id]
         rules = {
             "id": db.new_id(),
             "transaction_id": txn_id,
@@ -292,7 +298,11 @@ class ReclaimEngine:
         db.insert_attempt(rules)
         db.update_review_item(id=item_id, status="approved", decided_at=sim_now.isoformat() + "Z",
                               decided_by="merchant_ops", decided_extra_attempts=1)
-        db.log_audit(txn_id, "review_approve", SRC_HUMAN, {"item": item_id})
+        db.log_audit(txn_id, "review_approve", SRC_HUMAN, {
+            "item": item_id,
+            "category": classification["predicted_reason"],
+            "override": item["category"] in HARD_NO_RETRY_CATEGORIES,
+        })
         return {"ok": True, "transaction_id": txn_id}
 
     def dismiss_review(self, item_id: str) -> dict:

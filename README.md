@@ -264,6 +264,14 @@ is routed to a **human review queue** (`POST /review/approve`, `POST /review/dis
 Only an explicit human approval permits a retry attempt for these, and that attempt is
 tagged `source=human` in the audit trail. No risky payment is ever auto-retried.
 
+Risk/Fraud Block payments are the strictest case: they sit in the queue with **zero**
+automatic attempts, but an operator can **approve exactly one retry** — a bounded,
+audit-logged one-time override (capped by `MAX_HUMAN_RETRIES_PER_TRANSACTION = 1` and
+the global attempt cap in `backend/bounds.py`). The `review_approve` audit entry records
+`override: true` for no-retry categories, so every manually-approved risk retry is fully
+attributable. Approve schedules one bounded `source=human` attempt; dismiss closes the
+item with the transaction marked lost.
+
 ## Real Payment Links (Razorpay test mode)
 
 Events stay synthetic, but the **execution step** now hits Razorpay's *real*

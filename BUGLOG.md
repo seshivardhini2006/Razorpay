@@ -187,3 +187,31 @@ The demo's event generator was switched to emit only these documented codes (the
 `insufficient_balance` / `bank_timeout` / `risk_blocked` pseudo-codes are gone), so
 every dashboard record traces to a real Razorpay error reason. Provenance is enforced
 by `backend/check_taxonomy.py` (7 checks, all PASS). Suite still 34/34.
+
+---
+
+## 2026-09-05 — human review queue: approve-one-retry for Risk/Fraud Block
+
+**Symptom (reviewer feedback #7):** Risk/Fraud Block read as "no retry, out of scope" —
+an operator approving an escalated risk payment was refused.
+
+**Truth-check:** the queue, status field, `POST /review/approve` / `/review/dismiss`
+endpoints, and the dashboard list already existed; risk and ambiguous items were already
+routed there instead of being auto-retried. The real gap: `approve_review` blanket-refused
+human approvals for `HARD_NO_RETRY_CATEGORIES` (auto-dismissed them silently).
+
+**Fix (`engine.approve_review`):** a human can now approve **exactly one bounded retry for
+any queued category**, including Risk/Fraud Block. Guardrails kept:
+- still capped by `GLOBAL_MAX_AUTOMATIC_ATTEMPTS + MAX_HUMAN_RETRIES_PER_TRANSACTION`;
+- a new `human retry cap reached; auto-dismissed` guard enforces the single human retry;
+- the approving attempt is `source=human`; `review_approve` audit records the category
+  and an `override: true` flag when a no-retry category is human-approved;
+- pure-auto retries for risk remain forbidden (`validate_automatic_retry` unchanged); the
+  dangerous `auto_retry_risk` merchant toggle stays default-off;
+- dismiss path unchanged (item closed, transaction marked lost).
+
+**Verified:** live over the HTTP API — risk item approved (`ok:true`, was refused before),
+one `source=human` attempt scheduled then executed on clock advance; second approve
+refused; dismiss closes cleanly. 6 new tests in `backend/tests/test_review.py`; test DB
+isolation fixed via a shared per-session DB in `conftest.py` (was breaking
+`test_payment_links`). Suite 40/40.
