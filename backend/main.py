@@ -1,4 +1,4 @@
-"""Reclaim API: FastAPI backend exposing the Reclaim engine."""
+"""Revive API: FastAPI backend exposing the Revive engine."""
 
 from datetime import timedelta
 
@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # Load optional .env (repo root/backend) BEFORE db is imported so env-driven
-# settings like RECLAIM_DB_PATH resolve here too. Never overrides real env vars.
+# settings like REVIVE_DB_PATH resolve here too. Never overrides real env vars.
 from env_loader import load_env_file
 load_env_file()
 
@@ -17,7 +17,7 @@ from models import PaymentEvent, MerchantConfig
 from engine import engine
 from event_generator import generate_batch
 
-app = FastAPI(title="Reclaim — AI-Powered Payment Recovery Engine")
+app = FastAPI(title="Revive — AI-Powered Payment Recovery Engine")
 
 app.add_middleware(
     CORSMiddleware,
@@ -65,7 +65,7 @@ def health():
 
 @app.post("/events/generate", response_model=IngestResponse)
 def generate_and_process(batch: BatchRequest):
-    """Generate synthetic failure events and run each through the Reclaim pipeline."""
+    """Generate synthetic failure events and run each through the Revive pipeline."""
     events = generate_batch(max(1, min(batch.count, 300)))
     processed_count = 0
     routed_to_review = 0

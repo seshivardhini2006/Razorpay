@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "description": "Reclaim's failure taxonomy, grounded in Razorpay's OFFICIAL documented error reason codes rather than an invented subset. Every rule in 'rules' maps a code listed on a Razorpay docs page into one of Reclaim's recovery categories (mapping categories is fine - the point is the table traces to the real API).",
+    "description": "Revive's failure taxonomy, grounded in Razorpay's OFFICIAL documented error reason codes rather than an invented subset. Every rule in 'rules' maps a code listed on a Razorpay docs page into one of Revive's recovery categories (mapping categories is fine - the point is the table traces to the real API).",
     "sources": [
       "https://razorpay.com/docs/errors/payments/list/#bad-request-errors",
       "https://razorpay.com/docs/errors/payments/list/#gateway-errors",

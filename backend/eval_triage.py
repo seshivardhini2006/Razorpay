@@ -199,7 +199,7 @@ def evaluate(use_heuristic: bool) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Eval guard for Reclaim's triage step.")
+    parser = argparse.ArgumentParser(description="Eval guard for Revive's triage step.")
     parser.add_argument("--heuristic", action="store_true", help="Force keyless heuristic baseline.")
     parser.add_argument("--sample", type=int, default=None, help="Print proposal detail for one case index.")
     args = parser.parse_args()

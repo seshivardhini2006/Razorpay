@@ -239,7 +239,7 @@ body {
   transition: width 0.6s ease;
 }
 
-.compare-bar.reclaim { background: linear-gradient(90deg, var(--razorpay), var(--primary-light)); }
+.compare-bar.revive { background: linear-gradient(90deg, var(--razorpay), var(--primary-light)); }
 .compare-bar.baseline { background: linear-gradient(90deg, #3a4157, #4a5268); }
 
 .compare-pct {

@@ -289,7 +289,7 @@ function Header({ simulate, simulating, reset }) {
       <div className="brand">
         <div className="brand-logo">R</div>
         <div>
-          <h1>Reclaim</h1>
+          <h1>Revive</h1>
           <div className="tagline">AI-Powered Payment Recovery Engine</div>
         </div>
       </div>
@@ -341,12 +341,12 @@ function StatsRow({ stats, counterDelta }) {
       <div className="stat-card">
         <div className="stat-label">Recovery Rate</div>
         <div className="stat-value primary">{stats.recovery_rate.toFixed(1)}%</div>
-        <div className="stat-sub">of failed value reclaimed</div>
+        <div className="stat-sub">of failed value reviveed</div>
       </div>
       <div className="stat-card">
         <div className="stat-label">vs. Blind Retry</div>
         <div className="stat-value">
-          {c.baseline_rate > 0 ? `+${(c.reclaim_rate - c.baseline_rate).toFixed(1)}pp` : '—'}
+          {c.baseline_rate > 0 ? `+${(c.revive_rate - c.baseline_rate).toFixed(1)}pp` : '—'}
         </div>
         <div className="stat-sub">uplift in recovery rate</div>
       </div>
@@ -357,19 +357,19 @@ function StatsRow({ stats, counterDelta }) {
 function ComparisonCard({ stats }) {
   if (!stats || !stats.comparison) return null
   const c = stats.comparison
-  const max = Math.max(c.reclaim_rate, c.baseline_rate, 1)
+  const max = Math.max(c.revive_rate, c.baseline_rate, 1)
   return (
     <div className="card">
-      <div className="card-title">Reclaim vs. Blind Retry Baseline</div>
+      <div className="card-title">Revive vs. Blind Retry Baseline</div>
       <div className="comparison-chart">
         <div className="compare-row">
-          <div className="compare-label">Reclaim</div>
+          <div className="compare-label">Revive</div>
           <div className="compare-bar-wrap">
-            <div className="compare-bar reclaim" style={{ width: `${(c.reclaim_rate / max) * 100}%` }}>
-              {formatINR(c.reclaim_value)}
+            <div className="compare-bar revive" style={{ width: `${(c.revive_rate / max) * 100}%` }}>
+              {formatINR(c.revive_value)}
             </div>
           </div>
-          <div className="compare-pct" style={{ color: 'var(--green)' }}>{c.reclaim_rate.toFixed(1)}%</div>
+          <div className="compare-pct" style={{ color: 'var(--green)' }}>{c.revive_rate.toFixed(1)}%</div>
         </div>
         <div className="compare-row">
           <div className="compare-label">Blind Retry</div>
@@ -381,7 +381,7 @@ function ComparisonCard({ stats }) {
           <div className="compare-pct" style={{ color: 'var(--text-dim)' }}>{c.baseline_rate.toFixed(1)}%</div>
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>
-          Same failed pool, same volume. Reason-aware timing recovers {formatINR(Math.max(c.reclaim_value - c.baseline_value, 0))} more.
+          Same failed pool, same volume. Reason-aware timing recovers {formatINR(Math.max(c.revive_value - c.baseline_value, 0))} more.
         </div>
       </div>
     </div>

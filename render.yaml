@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: reclaim-ai
+    name: revive-ai
     runtime: python
     plan: free
     rootDir: .

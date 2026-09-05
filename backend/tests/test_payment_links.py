@@ -75,7 +75,7 @@ def test_real_request_shape_and_basic_auth(monkeypatch):
     assert body["customer"]["name"] == "Asha Rao"
     assert body["customer"]["contact"] == "919876543210"
     assert body["notify"]["sms"] is True
-    assert body["notes"]["reclaim_transaction_id"] == "txn_20260905_00001"
+    assert body["notes"]["revive_transaction_id"] == "txn_20260905_00001"
     assert captured["timeout"] == rzp.TIMEOUT_SECONDS
 
 
@@ -103,12 +103,12 @@ def test_credentials_require_both_parts(monkeypatch):
 
 
 def test_engine_attaches_offline_link_to_prompt_flow(tmp_path, monkeypatch):
-    monkeypatch.setenv("RECLAIM_DB_PATH", str(tmp_path / "reclaim_links.db"))
+    monkeypatch.setenv("REVIVE_DB_PATH", str(tmp_path / "revive_links.db"))
     import db as dbmod
     import engine as eng
     dbmod.init_db()
 
-    sim = eng.ReclaimEngine()
+    sim = eng.ReviveEngine()
     ev = _event(reason="expired_card deact", error_code="card_expired")
     msg = sim.ingest(ev)["message"]
 
@@ -123,12 +123,12 @@ def test_engine_attaches_offline_link_to_prompt_flow(tmp_path, monkeypatch):
 
 
 def test_engine_skips_link_for_scheduled_retry_flow(tmp_path, monkeypatch):
-    monkeypatch.setenv("RECLAIM_DB_PATH", str(tmp_path / "reclaim_other.db"))
+    monkeypatch.setenv("REVIVE_DB_PATH", str(tmp_path / "revive_other.db"))
     import db as dbmod
     import engine as eng
     dbmod.init_db()
 
-    sim = eng.ReclaimEngine()
+    sim = eng.ReviveEngine()
     ev = _event(reason="Bank server unreachable", error_code="bank_down")
     msg = sim.ingest(ev)["message"]
 

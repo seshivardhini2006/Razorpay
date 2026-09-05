@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = Path(os.environ.get("RECLAIM_DB_PATH", str(Path(__file__).parent / "reclaim.db")))
+DB_PATH = Path(os.environ.get("REVIVE_DB_PATH", str(Path(__file__).parent / "revive.db")))
 
 _lock = threading.Lock()
 

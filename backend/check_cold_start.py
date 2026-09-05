@@ -1,7 +1,7 @@
 """Cold-start proof: the whole pipeline runs with NO API keys / no .env.
 
 Judges clone the repo, run this, and see that nothing is blocked by missing
-credentials. It strips every GEMINI_*/RAZORPAY_*/RECLAIM_* variable, ingests a
+credentials. It strips every GEMINI_*/RAZORPAY_*/REVIVE_* variable, ingests a
 batch of synthetic failures into a throwaway database, and asserts both
 graceful fallbacks fired:
 
@@ -24,14 +24,14 @@ sys.path.insert(0, BACKEND)
 
 # Strip every credential/config var before any backend module loads.
 for key in list(os.environ):
-    if any(token in key.upper() for token in ("GEMINI", "RAZORPAY", "RECLAIM", "LLM")):
+    if any(token in key.upper() for token in ("GEMINI", "RAZORPAY", "REVIVE", "LLM")):
         os.environ.pop(key, None)
 
 # Throwaway DB, chosen BEFORE importing backend modules (db reads env at import).
 import tempfile
 
-DB = os.path.join(tempfile.gettempdir(), "reclaim_cold_start_check.db")
-os.environ["RECLAIM_DB_PATH"] = DB
+DB = os.path.join(tempfile.gettempdir(), "revive_cold_start_check.db")
+os.environ["REVIVE_DB_PATH"] = DB
 for suffix in ("", "-wal", "-shm"):
     try:
         os.remove(DB + suffix)
@@ -45,7 +45,7 @@ assert not MISSING, f"credential vars still present: {MISSING}"
 import db
 import simclock
 from event_generator import generate_batch
-from engine import ReclaimEngine
+from engine import ReviveEngine
 from models import SRC_RULE, SRC_HEURISTIC, SRC_SIM, SRC_HUMAN, SRC_LLM
 
 # Deterministic batch so the proof is reproducible (generate_batch is random).
@@ -53,7 +53,7 @@ import random
 random.seed(20260905)
 
 db.init_db()
-sim = ReclaimEngine()
+sim = ReviveEngine()
 
 batch = generate_batch(40)
 for ev in batch:

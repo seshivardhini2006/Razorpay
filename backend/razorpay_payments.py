@@ -94,7 +94,7 @@ def create_payment_link(
         }
     except Exception as exc:
         print(
-            f"[Reclaim] Razorpay Payment Link creation failed ({exc}); "
+            f"[Revive] Razorpay Payment Link creation failed ({exc}); "
             "falling back to template message without a link.",
             file=sys.stderr,
         )
@@ -113,8 +113,8 @@ def create_link_for_event(event) -> dict | None:
             "contact": contact,
         },
         notes={
-            "reclaim_transaction_id": event.transaction_id,
-            "reclaim_merchant_id": event.merchant_id,
-            "reclaim_iso": "1",
+            "revive_transaction_id": event.transaction_id,
+            "revive_merchant_id": event.merchant_id,
+            "revive_iso": "1",
         },
     )

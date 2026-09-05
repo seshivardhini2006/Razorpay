@@ -1,4 +1,4 @@
-# BUGLOG — Reclaim
+# BUGLOG — Revive
 
 Usual practice for this repo: when a bug is found during development, it goes here
 with the root cause and the fix. Kept small on purpose — decision log, not a novel.
@@ -60,7 +60,7 @@ row — including attempt 1 written at **scheduling** time, before execution.
 
 ## 2026-09-05 — CLI demo called `engine.advance()`, which does not exist
 
-**Symptom:** `AttributeError: 'ReclaimEngine' object has no attribute 'advance'`.
+**Symptom:** `AttributeError: 'ReviveEngine' object has no attribute 'advance'`.
 
 **Root cause:** the demo assumed a convenience method; the advanced engine deliberately
 separates the clock (`simclock.advance(delta)`) from the execution step
@@ -73,7 +73,7 @@ separates the clock (`simclock.advance(delta)`) from the execution step
 ## Process note — demo must not touch server data
 
 The CLI demo shares the same module tree as the server. Running it wiped/leaked into
-`backend/reclaim.db` during development. Fix: `db.py` honors `RECLAIM_DB_PATH`, and
+`backend/revive.db` during development. Fix: `db.py` honors `REVIVE_DB_PATH`, and
 `scripts/demo.py` points it at a temp file and initializes+resets its own schema
 (`db.init_db()` then `db.reset_db()`) before replaying the lifecycle.
 
@@ -178,7 +178,7 @@ but weren't traceable to a real Razorpay API list, and the README called it
 **Fix:** rebuilt the taxonomy from Razorpay's actual published pages —
 `docs/errors/payments/list` (Bad Request + Gateway error reasons) and
 `docs/errors/payments/cards` — and mapped **every** listed `error_reason` into one of
-Reclaim's 8 recovery categories. Each of the 112 rules now carries:
+Revive's 8 recovery categories. Each of the 112 rules now carries:
 - `doc` — the exact docs slug it came from;
 - `note` — the documented meaning (not an invented gloss);
 - a category + confidence reflecting how recoverable the doc description is.
@@ -227,7 +227,7 @@ recovery step kept producing `source=offline` mock links even with keys present.
 **Fix:** added a tiny dependency-free loader `backend/env_loader.py`
 (KEY=VALUE / `export` / quotes / comments, `setdefault` semantics). It is called
 **only** at app entrypoints — top of `backend/main.py` (before `import db`, so
-`RECLAIM_DB_PATH` from `.env` also resolves) and `scripts/demo.py` — and **never** on
+`REVIVE_DB_PATH` from `.env` also resolves) and `scripts/demo.py` — and **never** on
 plain `import`, so the no-keys cold-start proof (`check_cold_start.py`) stays valid
 even with a populated `.env` on disk. Real env vars always win over `.env`; `.env`
 remains gitignored.

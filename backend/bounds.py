@@ -1,4 +1,4 @@
-"""Hard safety bounds for every Reclaim action.
+"""Hard safety bounds for every Revive action.
 
 These are enforced in code (not prompts, not policy files) — the LLM/heuristic
 proposes, the rules dispose. Everything here is applied to every path: automatic

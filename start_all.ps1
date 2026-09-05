@@ -1,4 +1,4 @@
-# Launches Reclaim backend (FastAPI) and frontend (Vite) in background windows.
+# Launches Revive backend (FastAPI) and frontend (Vite) in background windows.
 $backend = Start-Process -FilePath "C:\Users\seshi\Downloads\Razorpay\venv\Scripts\python.exe" `
   -ArgumentList "-m","uvicorn","main:app","--port","8000" `
   -WorkingDirectory "C:\Users\seshi\Downloads\Razorpay\backend" -PassThru

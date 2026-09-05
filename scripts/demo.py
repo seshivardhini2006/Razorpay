@@ -1,4 +1,4 @@
-"""Reclaim - terminal demo of the full recovery lifecycle.
+"""Revive - terminal demo of the full recovery lifecycle.
 
 Run from the repo root:
 
@@ -25,10 +25,10 @@ from env_loader import load_env_file
 load_env_file()
 
 # Point the engine at a throwaway DB so the demo never touches server data.
-os.environ["RECLAIM_DB_PATH"] = os.path.join(tempfile.gettempdir(), "reclaim_demo_simulated.db")
+os.environ["REVIVE_DB_PATH"] = os.path.join(tempfile.gettempdir(), "revive_demo_simulated.db")
 
 os.environ.setdefault("GEMINI_API_KEY", "")
-os.environ["RECLAIM_USE_LLM"] = "1" if os.environ.get("GEMINI_API_KEY") and "--llm" in sys.argv else "0"
+os.environ["REVIVE_USE_LLM"] = "1" if os.environ.get("GEMINI_API_KEY") and "--llm" in sys.argv else "0"
 
 
 def banner(text):
@@ -44,7 +44,7 @@ def main():
     parser.add_argument("--count", type=int, default=40)
     args = parser.parse_args()
 
-    from engine import ReclaimEngine
+    from engine import ReviveEngine
     from event_generator import generate_batch
     import simclock
     import engine as engine_mod
@@ -54,15 +54,15 @@ def main():
         print("GEMINI_API_KEY not set - falling back to heuristic path.\n")
         args.llm = False
 
-    if os.environ.get("RECLAIM_USE_LLM") == "1":
-        engine_mod.RECLAIM_USE_LLM = True
+    if os.environ.get("REVIVE_USE_LLM") == "1":
+        engine_mod.REVIVE_USE_LLM = True
 
     db.init_db()
     db.reset_db()
     simclock.reset()
-    engine = ReclaimEngine()
+    engine = ReviveEngine()
 
-    banner("Reclaim - AI Payment Recovery Engine")
+    banner("Revive - AI Payment Recovery Engine")
     print("Pipeline : ingest -> classify (rules/heuristic/LLM) -> decide -> message -> route/schedule")
     print("Sources  : every decision is tagged rule | heuristic | llm | human | simulation")
     print("Review   : risky / ambiguous payments go to a human queue, never auto-retried")
@@ -112,7 +112,7 @@ def main():
     print(f"  Recovered value  : Rs {d['total_recovered_value'] / 100:,.2f}")
     print(f"  Recovery rate    : {d['recovery_rate']:.1f}%")
     print(f"  Blind-retry base : {c['baseline_rate']:.1f}%")
-    print(f"  Uplift           : +{max(c['reclaim_rate'] - c['baseline_rate'], 0):.1f} pp")
+    print(f"  Uplift           : +{max(c['revive_rate'] - c['baseline_rate'], 0):.1f} pp")
 
     banner("4) Inspect an audit trail")
 

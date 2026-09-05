@@ -1,4 +1,4 @@
-"""Reclaim core engine.
+"""Revive core engine.
 
 Orchestrates the full pipeline and schedules recovery attempts against the
 simulated clock:
@@ -48,7 +48,7 @@ from bounds import (
 # Base per-category success probability for the recovery simulation.
 # The first attempt is the best shot; later attempts decay (diminishing returns),
 # mirroring reality where repeated identical attempts help less.
-RECLAIM_SUCCESS_BASE = {
+REVIVE_SUCCESS_BASE = {
     "insufficient_funds": 0.55,
     "bank_server_downtime": 0.75,
     "otp_timeout": 0.80,
@@ -65,7 +65,7 @@ BLIND_SUCCESS = 0.25
 BLIND_DELAY_HOURS = 24
 
 
-class ReclaimEngine:
+class ReviveEngine:
     def ingest(self, event: PaymentEvent) -> dict:
         """Run a failure event through the pipeline."""
         sim_now = simclock.now()
@@ -206,7 +206,7 @@ class ReclaimEngine:
             return {"transaction_id": txn_id, "blocked": str(exc)}
 
         # ---- simulate outcome ----
-        base = RECLAIM_SUCCESS_BASE.get(category, 0.0)
+        base = REVIVE_SUCCESS_BASE.get(category, 0.0)
         attempt_num = attempt["attempt_number"]
         # first attempt is best; later attempts decay
         chance = base * (0.75 ** (attempt_num - 1))
@@ -401,11 +401,11 @@ class ReclaimEngine:
             },
             "review_remaining": review_remaining,
             "comparison": {
-                "reclaim_value": total_recovered,
-                "reclaim_count": recovered_count,
+                "revive_value": total_recovered,
+                "revive_count": recovered_count,
                 "baseline_value": baseline_recovered,
                 "baseline_count": baseline_count,
-                "reclaim_rate": (total_recovered / total_failed * 100) if total_failed else 0.0,
+                "revive_rate": (total_recovered / total_failed * 100) if total_failed else 0.0,
                 "baseline_rate": (baseline_recovered / total_failed * 100) if total_failed else 0.0,
             },
         }
@@ -436,8 +436,8 @@ class ReclaimEngine:
             "retry_pipeline": {"pending_review": 0, "scheduled_attempts": 0, "executed_attempts": 0},
             "review_remaining": 0,
             "comparison": {
-                "reclaim_value": 0, "reclaim_count": 0, "baseline_value": 0,
-                "baseline_count": 0, "reclaim_rate": 0.0, "baseline_rate": 0.0,
+                "revive_value": 0, "revive_count": 0, "baseline_value": 0,
+                "baseline_count": 0, "revive_rate": 0.0, "baseline_rate": 0.0,
             },
         }
 
@@ -533,4 +533,4 @@ def max_attempts_left(decision: dict) -> int:
 
 
 # module-level singleton used across the app
-engine = ReclaimEngine()
+engine = ReviveEngine()

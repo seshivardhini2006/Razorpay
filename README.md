@@ -1,4 +1,4 @@
-# Reclaim — AI-Powered Payment Recovery Engine
+# Revive — AI-Powered Payment Recovery Engine
 
 **Convert failed payments from dead ends into recovered revenue.**
 
@@ -8,7 +8,7 @@ payments** — not fraud, not disputes, just payments that failed for fixable re
 Traditional retry systems are *blind*: the same message, the same timing, the same
 channel, regardless of *why* the payment failed.
 
-**Reclaim** is an AI agent layered on top of payment infrastructure that:
+**Revive** is an AI agent layered on top of payment infrastructure that:
 
 1. **Diagnoses** why a payment failed
 2. **Decides** the smartest way and time to retry it
@@ -57,7 +57,7 @@ they stem from transient, fixable issues:
 | Network Drop | Connectivity mid-transaction | Yes — immediate retry |
 | Risk/Fraud Block | Bank/Razorpay risk engine blocked it | No — out of scope |
 
-Reclaim is **reason-aware** — the recovery strategy adapts to *why* a payment failed —
+Revive is **reason-aware** — the recovery strategy adapts to *why* a payment failed —
 unlike conventional dunning tools that are reason-blind and channel-generic.
 
 ---
@@ -124,7 +124,7 @@ unlike conventional dunning tools that are reason-blind and channel-generic.
 
 ### Design Principles
 
-- **Event-driven** — mirrors real webhook systems, so Reclaim slots in as an
+- **Event-driven** — mirrors real webhook systems, so Revive slots in as an
   *augmentation layer* rather than a replacement for existing infrastructure.
 - **Explainable by default** — every classification and every retry decision
   carries human-readable reasoning complemented by an append-only audit trail
@@ -152,7 +152,7 @@ unlike conventional dunning tools that are reason-blind and channel-generic.
 | **Safety Bounds** | Hard caps (max 4 auto attempts), cooldowns (5-min min), no-retry set, review-required set | `backend/bounds.py` |
 | **Recovery Agent** | Generates personalized, plain-language customer messages from reason-aware templates | `backend/recovery_agent.py` |
 | **Persistence + Audit** | SQLite (WAL); tables for events, classifications, decisions, messages, attempts, outcomes, review items, merchants, and an append-only `audit_log` | `backend/db.py` |
-| **Core Engine** | Orchestrates the pipeline; scheduler fires only attempts now due; simulates Reclaim vs. blind-retry outcomes | `backend/engine.py` |
+| **Core Engine** | Orchestrates the pipeline; scheduler fires only attempts now due; simulates Revive vs. blind-retry outcomes | `backend/engine.py` |
 | **Sim Clock** | Fast-forwards the scheduler (advance by hours; reset) so retries execute on-demand while replaying the real flow | `backend/simclock.py` |
 | **API Layer** | FastAPI endpoints for ingestion, dashboard, records, audit, review, merchant config, sim clock, evals | `backend/main.py` |
 | **Dashboard** | Live counters, sim clock controls, review queue, audit drawer, source tags, merchant config editor | `frontend/` (React + Recharts) |
@@ -170,7 +170,7 @@ Every one of the **112 rules** maps an `error_reason` that Razorpay actually
 documents ([List of Errors](https://razorpay.com/docs/errors/payments/list/) —
 Bad Request + Gateway errors — and
 [Cards Error Codes](https://razorpay.com/docs/errors/payments/cards/)) into a
-Reclaim recovery category via a `doc` slug + a note quoting the documented meaning.
+Revive recovery category via a `doc` slug + a note quoting the documented meaning.
 Codes that are customer/bank-actionable map to a concrete strategy; codes that are
 business/request-level or genuinely unknown map to `ambiguous` (triage → human
 review, never a blind auto-retry). Provenance is machine-checkable:
@@ -386,7 +386,7 @@ npm run dev
 **3. Open the dashboard**
 
 Visit **http://localhost:5173** and click **⚡ Stream failure events** to watch
-Reclaim diagnose, decide, and recover failed payments — then use the **sim clock**
+Revive diagnose, decide, and recover failed payments — then use the **sim clock**
 (＋2h / ＋12h / ＋1 day) to fast-forward retries and watch the recovered-revenue
 counter tick up against the blind-retry baseline. API docs live at
 **http://localhost:8000/docs**.
@@ -414,7 +414,7 @@ python backend/check_cold_start.py
 # -> processed: 40 | source tags: {heuristic, rule} | links: {offline: N} | COLD-START OK
 ```
 
-The script strips every `GEMINI*` / `RAZORPAY*` / `RECLAIM_*` variable, runs the full
+The script strips every `GEMINI*` / `RAZORPAY*` / `REVIVE_*` variable, runs the full
 pipeline into a throwaway database, and asserts the fallbacks fired.
 
 ### Optional LLM triage
@@ -456,7 +456,7 @@ Base URL: `http://localhost:8000`
 |---|---|---|
 | `GET` | `/health` | Service health check (+ current sim time) |
 | `POST` | `/events/generate` | `{"count": N}` — generates N synthetic failure events and runs each through classification → decision → messaging → outcome simulation |
-| `GET` | `/dashboard` | Aggregated metrics: failed/recovered value, recovery rate, reason & source breakdowns, retry pipeline (scheduled/executed/pending review), cumulative timeline, and Reclaim vs. blind-retry comparison |
+| `GET` | `/dashboard` | Aggregated metrics: failed/recovered value, recovery rate, reason & source breakdowns, retry pipeline (scheduled/executed/pending review), cumulative timeline, and Revive vs. blind-retry comparison |
 | `GET` | `/records?limit=N` | Most recent processed records with reason, source, confidence, routing, timing, attempts, message, and outcome |
 | `GET` | `/audit/{txn_id}` | Full append-only audit trail for one transaction |
 | `GET` | `/review` | Pending human review queue |
@@ -510,7 +510,7 @@ Verification performed during development:
   and the Razorpay `TEST` payment-link keys.
 - **`Dockerfile`** — reproducible backend image (`uvicorn main:app --port 8000`).
 - **`render.yaml`** — Render blueprint (free tier, `$PORT` aware).
-- **`DB_PATH`** is configurable via `RECLAIM_DB_PATH` (defaults to `backend/reclaim.db`),
+- **`DB_PATH`** is configurable via `REVIVE_DB_PATH` (defaults to `backend/revive.db`),
   which the CLI demo uses to avoid touching server data.
 
 ---
@@ -521,7 +521,7 @@ Verification performed during development:
   percentage-point uplift vs. a blind-retry baseline
 - **Sim clock bar** — current simulated time plus **＋2h / ＋12h / ＋1 day** controls to
   fast-forward the scheduler and fire retries on demand
-- **Reclaim vs. Blind Retry** — side-by-side recovery comparison over the same
+- **Revive vs. Blind Retry** — side-by-side recovery comparison over the same
   failed-transaction pool
 - **Retry Pipeline** — scheduled attempts, executed attempts, and pending-review count,
   plus source-tag distribution (rule / heuristic / LLM / human)

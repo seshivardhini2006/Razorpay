@@ -167,7 +167,7 @@ Reply with ONLY JSON of the shape:
         }
     except Exception as exc:
         # An unusable key / network failure must NEVER block the pipeline.
-        print(f"[Reclaim] LLM triage unavailable, using heuristic: {exc}", file=sys.stderr)
+        print(f"[Revive] LLM triage unavailable, using heuristic: {exc}", file=sys.stderr)
         return None
 
 

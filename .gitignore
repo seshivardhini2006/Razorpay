@@ -22,7 +22,7 @@ Thumbs.db
 *.log
 
 # Runtime artifacts
-backend/reclaim.db
-backend/reclaim.db-*
+backend/revive.db
+backend/revive.db-*
 backend/data/eval_results_*.json
 backend/data/benchmark_results_*.json

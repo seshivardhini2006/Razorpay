@@ -1,4 +1,4 @@
-"""Retry policy table for the Reclaim engine.
+"""Retry policy table for the Revive engine.
 
 Central, explainable, configurable. Every category maps to a distinct recovery
 strategy. Hard global bounds live in bound.py and are enforced at execution time
