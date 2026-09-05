@@ -1,11 +1,9 @@
 """Customer Communication Agent: generates plain-language, personalized recovery messages.
 
-Uses Claude (Anthropic Messages API) when an API key is provided, and falls back to
-high-quality templated generation (with the same reason-awareness) when it isn't, so
-the demo always works.
+Uses reason-aware templates — the message explains *why* the payment failed and
+suggests the right fix, adapted to whether it was a purchase or a subscription
+renewal. No third-party API required.
 """
-
-import os
 
 from models import PaymentEvent, RecoveryMessage, ClassificationResult, RetryDecision
 
@@ -46,37 +44,12 @@ REASON_GUIDANCE = {
 }
 
 
-def build_prompt(event, classification, decision) -> str:
-    """Construct a Claude prompt for a personalized recovery message."""
-    txn = event.transaction_id
-    amount_rs = event.amount / 100
-    reason = classification.predicted_reason
-    guidance = REASON_GUIDANCE.get(reason, REASON_GUIDANCE["unknown"])
-
-    context_type = "a subscription renewal" if event.is_subscription else "a purchase"
-
-    return f"""You are a payment recovery assistant at a payment gateway. Write a short, warm, plain-language SMS-style message (<140 words) to a customer whose {context_type} payment failed.
-
-CONTEXT:
-- Merchant: {event.merchant_name or 'the merchant'}
-- Transaction amount: Rs {amount_rs:.2f}
-- Why it failed (plain): {guidance['human_reason']}
-- Suggested fix: {guidance['fix']}
-- Customer name: {event.customer_name or 'Valued customer'}
-- Retry strategy chosen: {decision.retry_timing}
-
-REQUIREMENTS:
-1. Explain the reason in simple, non-technical language (no error codes).
-2. Include the specific suggested fix.
-3. Include a clear call to action to complete the payment (a retry/update link).
-4. Sound human and reassuring, not scripted. {('Remind them gently that their subscription continues uninterrupted once paid.' if event.is_subscription else 'Keep it short and purchase-oriented.')}
-5. Do NOT include sensitive details like full card numbers.
-
-Output only the message text, no preamble."""
-
-
-def _template_message(event, classification, decision) -> RecoveryMessage:
-    """Fallback generator used when no Claude API key is present."""
+def generate_message(
+    event: PaymentEvent,
+    classification: ClassificationResult,
+    decision: RetryDecision,
+) -> RecoveryMessage:
+    """Generate a reason-aware recovery message for a failed payment."""
     txn = event.transaction_id
     amount_rs = event.amount / 100
     reason = classification.predicted_reason
@@ -108,40 +81,3 @@ def _template_message(event, classification, decision) -> RecoveryMessage:
         message=body,
         channel="whatsapp",
     )
-
-
-def generate_message(
-    event: PaymentEvent,
-    classification: ClassificationResult,
-    decision: RetryDecision,
-) -> RecoveryMessage:
-    """Generate a recovery message, using Claude when available."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        return _template_message(event, classification, decision)
-
-    try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=api_key)
-        prompt = build_prompt(event, classification, decision)
-        resp = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=300,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = "".join(
-            block.text for block in resp.content if getattr(block, "type", "") == "text"
-        )
-        return RecoveryMessage(
-            transaction_id=event.transaction_id,
-            subject=(
-                "Your subscription payment needs attention"
-                if event.is_subscription
-                else "Complete your payment"
-            ),
-            message=text.strip(),
-            channel="whatsapp",
-        )
-    except Exception:
-        return _template_message(event, classification, decision)

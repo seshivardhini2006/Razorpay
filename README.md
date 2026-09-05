@@ -32,7 +32,6 @@ channel, regardless of *why* the payment failed.
 - [API Reference](#api-reference)
 - [Dashboard Overview](#dashboard-overview)
 - [Demo Narrative](#demo-narrative)
-- [Configuring Claude for Personalized Messages](#configuring-claude-for-personalized-messages)
 - [Project Structure](#project-structure)
 
 ---
@@ -87,7 +86,7 @@ unlike conventional dunning tools that are reason-blind and channel-generic.
                  ▼                              ▼
    ┌────────────────────────────┐   ┌──────────────────────────────┐
    │ [3] Recovery Agent          │   │ [4] Merchant Dashboard       │
-   │     • Claude-generated      │   │     • Live revenue counter   │
+   │     • Reason-aware          │   │     • Live revenue counter   │
    │       personalized message  │   │     • Reason breakdown       │
    │     • Sent via simulated    │   │     • Reclaim vs. baseline   │
    │       SMS/WhatsApp/email    │   │       comparison             │
@@ -120,7 +119,7 @@ unlike conventional dunning tools that are reason-blind and channel-generic.
 | **Event Simulator** | Generates realistic synthetic failures (weighted reasons, banks, merchants, subscription/purchase mix) | `backend/event_generator.py` |
 | **Failure Classifier** | Maps error codes → failure reason via 3 rule layers, outputs confidence + explanation | `backend/classifier.py` |
 | **Retry Decision Engine** | Selects timing, channel, and attempt limits from a configurable policy table | `backend/retry_engine.py`, `backend/policies.py` |
-| **Recovery Agent** | Generates personalized, plain-language customer messages (Claude, template fallback) | `backend/recovery_agent.py` |
+| **Recovery Agent** | Generates personalized, plain-language customer messages from reason-aware templates | `backend/recovery_agent.py` |
 | **Core Engine** | Orchestrates the pipeline and simulates Reclaim vs. blind-retry outcomes | `backend/engine.py` |
 | **API Layer** | FastAPI endpoints for ingestion, dashboard stats, and records | `backend/main.py` |
 | **Dashboard** | Live recovered-revenue counter, charts, comparison, and event feed | `frontend/` (React + Recharts) |
@@ -153,7 +152,6 @@ Global safeguards: a hard cap of **4 automatic attempts per transaction** and
 
 - **Python 3.11+**
 - **Node.js 18+** (with npm)
-- *(Optional)* An `ANTHROPIC_API_KEY` for Claude-generated customer messages
 
 ### Quick Start
 
@@ -170,30 +168,21 @@ cd frontend
 npm install
 ```
 
-**2. (Optional) Enable real Claude messages**
-
-```powershell
-$env:ANTHROPIC_API_KEY = "sk-ant-..."
-```
-
-Without a key, Reclaim gracefully falls back to reason-aware template messages, so
-the demo runs anywhere.
-
-**3. Start the backend (FastAPI → :8000)**
+**2. Start the backend (FastAPI → :8000)**
 
 ```powershell
 cd backend
 ..\venv\Scripts\python -m uvicorn main:app --port 8000
 ```
 
-**4. Start the frontend (Vite + React → :5173)**
+**3. Start the frontend (Vite + React → :5173)**
 
 ```powershell
 cd frontend
 npm run dev
 ```
 
-**5. Open the dashboard**
+**4. Open the dashboard**
 
 Visit **http://localhost:5173** and click **⚡ Stream failure events** to watch
 Reclaim diagnose, decide, and recover failed payments in real time — the recovered
@@ -257,14 +246,11 @@ Invoke-RestMethod -Uri "http://localhost:8000/events/generate" `
    and a plain-English explanation.
 4. **Show the retry decision** — different reasons get different strategies (the core
    differentiator vs. blind retry).
-5. **Show the customer message** — a personalized Claude-generated nudge side-by-side
+5. **Show the customer message** — a personalized, reason-aware nudge side-by-side
    with a generic "payment failed" message.
 6. **Show the dashboard** — the recovered-revenue counter ticking up vs. the baseline.
 7. **Close with business impact** — recovered % as incremental GMV at near-zero
    marginal cost, with a direct lift for subscription retention.
-
----
-
 
 ---
 
@@ -278,7 +264,7 @@ Razorpay/
 │   ├── classifier.py            # Failure reason classification (rules-first)
 │   ├── retry_engine.py          # Retry decision logic
 │   ├── policies.py              # Configurable retry policy table + caps
-│   ├── recovery_agent.py        # Claude / template customer messaging
+│   ├── recovery_agent.py        # Reason-aware customer messaging
 │   ├── event_generator.py       # Synthetic failure event simulation
 │   ├── models.py                # Typed data schemas
 │   └── requirements.txt
