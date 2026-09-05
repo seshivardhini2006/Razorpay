@@ -1,7 +1,10 @@
 """Synthetic failure event generator for demo purposes.
 
-Produces realistic failure distributions based on a publicly-known payment
-failure taxonomy. All data is synthetic - no real customer PII.
+Produces realistic failure distributions based on a documented-style failure
+taxonomy (see backend/data/razorpay_error_reasons.json). A small share of events
+use generic catch-all codes so the triage + human-review path gets exercised too.
+
+All data is synthetic — no real customer PII.
 """
 
 import random
@@ -19,27 +22,56 @@ MERCHANTS = [
     ("merch_005", "Streamly Media"),
 ]
 
-# (reason_code, bank_failure_rate_weight) — banks aren't all equally reliable
-# Error codes with their underlying failure reason
+# error code + human-readable Razorpay-style failure reason, per category
 ERROR_POOL = {
-    "insufficient_funds": ["INSUFFICIENT_FUNDS", "INSUFFICIENT_BALANCE", "LOW_BALANCE"],
-    "bank_server_downtime": ["BANK_TIMEOUT", "GATEWAY_ERROR", "HOST_TIME_OUT", "BANK_UNAVAILABLE"],
-    "otp_timeout": ["OTP_EXPIRED", "OTP_TIMEOUT"],
-    "expired_card": ["CARD_EXPIRED", "EXPIRED_CARD"],
-    "wrong_cvv_pin": ["INVALID_CVV", "INVALID_PIN", "WRONG_CVV"],
-    "network_drop": ["CONNECTION_ERROR", "NETWORK_ERROR", "CONNECTION_TIMEOUT"],
-    "risk_fraud_block": ["RISK_BLOCKED", "TECHNICAL_DECLINE"],
+    "insufficient_funds": [
+        ("insufficient_funds", "Insufficient funds in the account"),
+        ("insufficient_balance", "Account balance is below the transaction amount"),
+        ("low_balance", "Low balance at the time of debit"),
+    ],
+    "bank_server_downtime": [
+        ("bank_timeout", "Bank could not respond in time"),
+        ("bank_unavailable", "Bank is currently unavailable"),
+        ("host_time_out", "Host response timed out"),
+        ("bank_technical_error", "Technical error at the issuing bank"),
+    ],
+    "otp_timeout": [
+        ("otp_expired", "OTP expired before verification"),
+        ("otp_timeout", "OTP verification timed out"),
+    ],
+    "wrong_cvv_pin": [
+        ("invalid_cvv", "Incorrect CVV entered"),
+        ("invalid_pin", "Incorrect UPI PIN entered"),
+        ("invalid_otp", "OTP entered was incorrect"),
+    ],
+    "expired_card": [
+        ("card_expired", "Card has expired"),
+    ],
+    "network_drop": [
+        ("network_failure", "Network failure during transaction"),
+        ("connection_timeout", "Connection timed out"),
+    ],
+    "risk_fraud_block": [
+        ("risk_blocked", "Transaction flagged as risky by fraud engine"),
+        ("fraud_blocked", "Fraud engine blocked the transaction"),
+    ],
+    "ambiguous": [
+        ("card_declined", "Card declined by the bank"),
+        ("payment_failed", "Payment could not be processed"),
+        ("timeout", "Transaction timed out"),
+    ],
 }
 
 # Most common real-world recoverable distribution (weights sum ~1)
 REASON_WEIGHTS = {
-    "insufficient_funds": 0.25,
-    "bank_server_downtime": 0.20,
-    "otp_timeout": 0.18,
-    "wrong_cvv_pin": 0.14,
+    "insufficient_funds": 0.22,
+    "bank_server_downtime": 0.18,
+    "otp_timeout": 0.16,
+    "wrong_cvv_pin": 0.13,
     "network_drop": 0.12,
-    "expired_card": 0.07,
-    "risk_fraud_block": 0.04,
+    "expired_card": 0.06,
+    "risk_fraud_block": 0.05,
+    "ambiguous": 0.08,
 }
 
 FIRST_NAMES = ["Aarav", "Diya", "Rohan", "Ananya", "Karthik", "Meera", "Vihaan", "Saanvi",
@@ -73,7 +105,7 @@ def generate_event(txn_counter, now=None) -> PaymentEvent:
     bank = random.choice(BANKS)
 
     # Bank downtime concentrated on a couple of "unreliable" banks for the story
-    if reason == "bank_server_downtime" and "HDFC" in bank:
+    if reason == "bank_server_downtime" and bank in ("HDFC",):
         bank = random.choice(["SBI", "Punjab National"])
 
     customer_id = f"cust_{1000 + random.randint(1, 999)}"
@@ -82,7 +114,7 @@ def generate_event(txn_counter, now=None) -> PaymentEvent:
     amount = random.choice([299, 499, 799, 999, 1499, 1999, 2499, 2999, 4999, 7999, 12999]) * random.choice([1, 1, 2, 5])
     is_subscription = random.random() < 0.25
 
-    error_code = random.choice(ERROR_POOL[reason])
+    error_code, reason_text = random.choice(ERROR_POOL[reason])
 
     return PaymentEvent(
         transaction_id=f"txn_{now:%Y%m%d}_{txn_counter:05d}",
@@ -96,6 +128,7 @@ def generate_event(txn_counter, now=None) -> PaymentEvent:
         payment_method=method,
         bank=bank,
         error_code=error_code,
+        reason=reason_text,
         timestamp=now.isoformat() + "Z",
         retry_count=0,
         is_subscription=is_subscription,

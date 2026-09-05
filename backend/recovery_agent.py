@@ -57,6 +57,23 @@ def generate_message(
     name = event.customer_name or "there"
     merchant = event.merchant_name or "the merchant"
 
+    # An ambiguous failure that went through triage may carry a drafted message
+    drafted = getattr(classification, "triage_message", None)
+    if drafted:
+        body = drafted.strip()
+        if not body.rstrip().endswith("."):
+            body += "."
+        return RecoveryMessage(
+            transaction_id=txn,
+            subject=(
+                "Your subscription payment needs attention"
+                if event.is_subscription
+                else f"Complete your payment with {merchant}"
+            ),
+            message=body,
+            channel="whatsapp",
+        )
+
     if event.is_subscription:
         subject = f"Your subscription payment needs attention"
         action = " Tap here to complete securely — your subscription continues seamlessly."

@@ -1,21 +1,20 @@
-"""
-Policy definitions for the Reclaim retry engine.
+"""Retry policy table for the Reclaim engine.
 
-Central place to tweak retry behavior. Every decision cites the reason
-it was chosen so the system stays explainable.
+Central, explainable, configurable. Every category maps to a distinct recovery
+strategy. Hard global bounds live in bound.py and are enforced at execution time
+regardless of these defaults.
 """
 
-# reason -> policy
-POLICIES = {
+POLICY_BY_CATEGORY = {
     "insufficient_funds": {
         "should_retry": True,
         "timing": "scheduled",
         "channel": "same_method",
         "max_attempts": 3,
-        "cooldown_minutes": 1440,  # ~24h, near likely salary/credit date
+        "cooldown_minutes": 1440,  # next day — near likely funding/salary date
         "reasoning": (
-            "Insufficient funds is typically transient (e.g. pre-payroll). "
-            "A delayed retry near a likely funding date has a high success probability."
+            "Insufficient funds is typically transient (e.g. pre-payroll/funding date). "
+            "A scheduled next-day retry near a likely funding moment has high success probability."
         ),
     },
     "bank_server_downtime": {
@@ -25,8 +24,8 @@ POLICIES = {
         "max_attempts": 3,
         "cooldown_minutes": 15,
         "reasoning": (
-            "Bank downtime is typically transient. A short-delay retry (10-15 min) "
-            "has a high success probability after the bank recovers."
+            "Bank downtime is typically transient; a short-delay retry (10-15 min) succeeds "
+            "once the issuer recovers."
         ),
     },
     "otp_timeout": {
@@ -36,19 +35,8 @@ POLICIES = {
         "max_attempts": 2,
         "cooldown_minutes": 5,
         "reasoning": (
-            "OTP timeout means the customer simply didn't complete the flow. "
-            "An immediate prompted retry usually succeeds once the customer is engaged."
-        ),
-    },
-    "expired_card": {
-        "should_retry": False,
-        "timing": "no_retry",
-        "channel": "alternate_method",
-        "max_attempts": 1,
-        "cooldown_minutes": 0,
-        "reasoning": (
-            "An expired card cannot be recovered by a blind retry. "
-            "The customer must supply a new card, so we prompt for a new method, not retry."
+            "OTP timeout means the customer didn't complete the flow. An immediate, prompted "
+            "retry with a fresh OTP usually succeeds."
         ),
     },
     "wrong_cvv_pin": {
@@ -58,8 +46,18 @@ POLICIES = {
         "max_attempts": 2,
         "cooldown_minutes": 5,
         "reasoning": (
-            "Wrong CVV/PIN is a user input error. An immediate retry with a correction "
-            "prompt usually succeeds once the customer re-enters correct details."
+            "Wrong CVV/PIN is a customer input error; an immediate corrected retry usually succeeds."
+        ),
+    },
+    "expired_card": {
+        "should_retry": False,
+        "timing": "no_retry",
+        "channel": "alternate_method",
+        "max_attempts": 1,
+        "cooldown_minutes": 0,
+        "reasoning": (
+            "An expired card can't be recovered by a blind retry — the customer must supply a "
+            "new card. Prompt for a new method instead."
         ),
     },
     "network_drop": {
@@ -69,8 +67,8 @@ POLICIES = {
         "max_attempts": 2,
         "cooldown_minutes": 5,
         "reasoning": (
-            "A network drop is a connectivity issue mid-transaction. "
-            "An immediate retry over a stable connection typically succeeds."
+            "A network drop is a connectivity issue mid-transaction; an immediate retry over a "
+            "stable connection usually succeeds."
         ),
     },
     "risk_fraud_block": {
@@ -80,24 +78,19 @@ POLICIES = {
         "max_attempts": 0,
         "cooldown_minutes": 0,
         "reasoning": (
-            "Risk/fraud blocks are outside the recovery scope. "
-            "Automatic retries could look like fraud; escalate to manual review instead."
+            "Risk/fraud blocks are outside recovery scope; auto-retries can look like fraud. "
+            "Escalate to human review."
         ),
     },
-    "unknown": {
+    "ambiguous": {
         "should_retry": False,
         "timing": "no_retry",
         "channel": "none",
         "max_attempts": 0,
         "cooldown_minutes": 0,
         "reasoning": (
-            "Unknown failure reason with low confidence. Conservative: no automatic retry "
-            "until the reason can be confirmed."
+            "Ambiguous failure with no reliable reason. Auto-retry refused; human review decides "
+            "whether any further attempt is justified."
         ),
     },
 }
-
-# Hard compliance caps (industry-aggressive but safe defaults for demo)
-GLOBAL_MAX_ATTEMPTS_PER_TRANSACTION = 4
-MIN_COOLDOWN_MINUTES_BETWEEN_ATTEMPTS = 5
-MISSING_CARD_THRESHOLD_DAYS = 1

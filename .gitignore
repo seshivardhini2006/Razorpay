@@ -20,3 +20,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Runtime artifacts
+backend/reclaim.db
+backend/reclaim.db-*
+backend/data/eval_results_*.json
+backend/data/benchmark_results_*.json

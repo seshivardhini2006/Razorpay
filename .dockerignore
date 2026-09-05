@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+venv/
+reclaim.db
+frontend/node_modules/
+frontend/dist/
+.env
+.git/
+data/eval_results_*.json
+data/benchmark_results_*.json
