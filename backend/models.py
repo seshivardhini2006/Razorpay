@@ -26,6 +26,7 @@ class PaymentEvent(BaseModel):
     retry_count: int = 0
     customer_name: Optional[str] = None
     customer_email: Optional[str] = None
+    phone: Optional[str] = None
     merchant_name: Optional[str] = None
     is_subscription: bool = False
 
@@ -60,6 +61,9 @@ class RecoveryMessage(BaseModel):
     message: str
     channel: str
     subject: Optional[str] = None
+    payment_link_id: Optional[str] = None  # Razorpay Payment Link id (real or offline mock)
+    payment_link_url: Optional[str] = None
+    payment_link_source: Optional[str] = None  # razorpay | offline
 
 
 class RetryAttempt(BaseModel):

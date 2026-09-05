@@ -107,3 +107,38 @@ ambiguous, and overruled proposals lose their drafted message. `rules_disposed` 
 carried on the classification for audit/eval visibility. Locked in by tests in
 `tests/test_triage.py` (7 new cases, including a mocked real Gemini call) — suite now
 28/28 passing.
+
+---
+
+## 2026-09-05 — migration helper indentation swallowed `log_audit`
+
+**Symptom:** after inserting `_migrate()` into `init_db` with a tab mistake, the
+`log_audit` body got nested under an `if`/`with` block that referenced undefined
+variables (`transaction_id`, `conn`), so audits would raise instead of write.
+
+**Root cause:** the `_migrate(conn)` call and `conn.close()` were appended in the wrong
+spot, leaving a dangling `conn.close()` on a closed connection and shifting `log_audit`
+inside the wrong scope.
+
+**Fix:** moved `_migrate()` to the top level and made `log_audit` a standalone function
+again (see `backend/db.py`). This surfaced while adding the `messages` table columns
+(`payment_link_id`, `payment_link_url`, `payment_link_source`) for the Razorpay
+Payment-Links integration.
+
+---
+
+## 2026-09-05 — real Payment Links execution step added
+
+**Context:** the engine's execution was fully synthetic, so nothing ever hit a real
+(provider) API. Task: at minimum integrate Razorpay's test-mode Payment Links API for
+the "prompt for new card" / retry-link flows.
+
+**Fix:** new `backend/razorpay_payments.py` issues a real `POST /v1/payment_links`
+(Basic auth from `RAZORPAY_TEST_KEY_ID`/`_SECRET`) for customer-completion categories
+(`expired_card`, `otp_timeout`, `wrong_cvv_pin`, `network_drop`, `insufficient_funds`),
+inset the short URL into the recovery message, and persist
+`payment_link_{id,url,source}` per transaction (migrated table) + a `payment_link`
+audit stage. Three-way graceful degradation: no keys → offline mock, success →
+`source=razorpay`, API failure → `None` (plain template, never a fake link). Events stay
+synthetic. Covered by 5 new tests in `backend/tests/test_payment_links.py` (> real
+request shape, Basic auth, failure fallback); suite now 34/34 passing.

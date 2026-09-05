@@ -30,6 +30,12 @@ from models import (
 from classifier import classify, get_reason_label
 from retry_engine import decide as decide_retry
 from recovery_agent import generate_message
+from razorpay_payments import create_link_for_event
+
+# Customer-completion flows where the execution step issues a real (test-mode)
+# Razorpay Payment Link. Categories are the canonical failure taxonomy labels.
+_LINK_FLOWS = {"expired_card", "otp_timeout", "network_drop",
+               "wrong_cvv_pin", "insufficient_funds"}
 from bounds import (
     GLOBAL_MAX_AUTOMATIC_ATTEMPTS,
     MIN_COOLDOWN_MINUTES_BETWEEN_ATTEMPTS,
@@ -86,8 +92,14 @@ class ReclaimEngine:
         )
 
         message = generate_message(event, classification, decision)
+        message = self._attach_payment_link(event, classification, message)
         db.upsert_message(message)
         db.log_audit(event.transaction_id, "message", "templates", {"message": message.message})
+        if message.payment_link_url:
+            db.log_audit(
+                event.transaction_id, "payment_link", message.payment_link_source,
+                {"link_id": message.payment_link_id, "url": message.payment_link_url},
+            )
 
         outcome = {
             "transaction_id": event.transaction_id,
@@ -455,6 +467,9 @@ class ReclaimEngine:
                 "next_retry_at": dec.get("next_retry_at"),
                 "max_attempts": dec.get("max_attempts"),
                 "message": msg.get("message"),
+                "payment_link_id": msg.get("payment_link_id"),
+                "payment_link_url": msg.get("payment_link_url"),
+                "payment_link_source": msg.get("payment_link_source"),
                 "recovered": bool(oc.get("recovered")),
                 "baseline_recovered": bool(oc.get("baseline_recovered")),
                 "retry_attempts": sum(1 for a in all_attempts if a.get("executed")),
@@ -462,6 +477,21 @@ class ReclaimEngine:
             })
         records.sort(key=lambda r: r["transaction_id"], reverse=True)
         return records[:limit]
+
+    def _attach_payment_link(self, event, classification, message) -> RecoveryMessage:
+        """Execution step: hit Razorpay's real test-mode Payment Links API for
+        customer-completion flows ("prompt for new card"/retry-link). Offline
+        mock is used when no test keys are configured; API failures degrade to
+        the plain template message (no fake link)."""
+        if classification.predicted_reason not in _LINK_FLOWS:
+            return message
+        link = create_link_for_event(event)
+        if link and link.get("short_url"):
+            message.payment_link_id = link.get("id")
+            message.payment_link_url = link.get("short_url")
+            message.payment_link_source = link.get("source")
+            message.message = f"{message.message} Pay here: {link.get('short_url')}"
+        return message
 
     def audit_for(self, txn_id: str) -> list:
         return db.get_audit_for(txn_id)

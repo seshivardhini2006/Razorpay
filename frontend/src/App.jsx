@@ -553,6 +553,11 @@ function FeedItem({ record, onClick }) {
         <span className="chip reason">{record.reason_label}</span>
         <span className="chip timing">{TIMING_LABELS[record.retry_timing] || record.retry_timing}</span>
         <span className="chip source">{SOURCE_LABELS[record.source] || record.source}</span>
+        {record.payment_link_source && (
+          <span className={`chip bank ${record.payment_link_source === 'razorpay' ? 'link-live' : ''}`}>
+            Payment link · {record.payment_link_source === 'razorpay' ? 'Razorpay' : 'offline'}
+          </span>
+        )}
         {record.routing === 'review' && <span className="chip timing amber">Awaiting review</span>}
         {record.retry_attempts > 0 && <span className="chip bank">{record.retry_attempts} attempt{record.retry_attempts > 1 ? 's' : ''}</span>}
         <span className={`chip ${record.recovered ? 'recovered' : 'failed'}`}>

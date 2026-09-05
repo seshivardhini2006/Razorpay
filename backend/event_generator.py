@@ -110,6 +110,8 @@ def generate_event(txn_counter, now=None) -> PaymentEvent:
 
     customer_id = f"cust_{1000 + random.randint(1, 999)}"
     name = f"{random.choice(FIRST_NAMES)} {random.choice(LAST_NAMES)}"
+    digit_hash = str(abs(hash(name)) % 100_000_000).zfill(8)
+    phone = "91" + digit_hash
     # amounts in rupees -> paise (e.g. 14999 = Rs 149.99). Realistic retail/subscription ranges.
     amount = random.choice([299, 499, 799, 999, 1499, 1999, 2499, 2999, 4999, 7999, 12999]) * random.choice([1, 1, 2, 5])
     is_subscription = random.random() < 0.25
@@ -123,6 +125,7 @@ def generate_event(txn_counter, now=None) -> PaymentEvent:
         customer_id=customer_id,
         customer_name=name,
         customer_email=f"{name.lower().replace(' ', '.')}@example.com",
+        phone=phone,
         amount=amount,
         currency="INR",
         payment_method=method,

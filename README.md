@@ -249,6 +249,36 @@ is routed to a **human review queue** (`POST /review/approve`, `POST /review/dis
 Only an explicit human approval permits a retry attempt for these, and that attempt is
 tagged `source=human` in the audit trail. No risky payment is ever auto-retried.
 
+## Real Payment Links (Razorpay test mode)
+
+Events stay synthetic, but the **execution step** now hits Razorpay's *real*
+[test-mode Payment Links API](https://razorpay.com/docs/payment-links/) for the
+customer-completion flows — "prompt for a new card", OTP retry, add-funds-and-pay.
+When a transaction is classified into one of those categories (`expired_card`,
+`otp_timeout`, `wrong_cvv_pin`, `network_drop`, `insufficient_funds`), the engine
+creates a real Payment Link and drops its short URL into the recovery message, so a
+human would pay through a genuine Razorpay link. The link id/url/source are stored
+per transaction and surfaced in the dashboard.
+
+Credentials are **test keys** from
+[`dashboard.razorpay.com` → Settings → API Keys](https://dashboard.razorpay.com/app/keys):
+
+```bash
+$env:RAZORPAY_TEST_KEY_ID="rzp_test_..."
+$env:RAZORPAY_TEST_KEY_SECRET="..."
+```
+
+Graceful degradation on three levels (see `backend/razorpay_payments.py`):
+
+1. **No keys**              → an offline mock link (`source=offline`) keeps the whole
+   pipeline observable in demos/tests — no Razorpay touchpoint, no fake contact.
+2. **Keys + success**       → real `POST /v1/payment_links`, `source=razorpay`.
+3. **Keys + API failure**   → returns `None`; the engine logs the failure and falls
+   back to the plain template message (no fabricated link is ever shown).
+
+The link step only runs for the prompt/customer-completion categories above; scheduled
+automatic retries (e.g. bank downtime) and risk/review flows are left untouched.
+
 ## Safety Bounds
 
 `backend/bounds.py` enforces hard, code-level limits (independent of policy config):
@@ -405,7 +435,8 @@ Verification performed during development:
 
 ## Deployment
 
-- **`.env.example`** — documents `GEMINI_API_KEY`, merchant allow-list, model name.
+- **`.env.example`** — documents `GEMINI_API_KEY`, merchant allow-list, model name,
+  and the Razorpay `TEST` payment-link keys.
 - **`Dockerfile`** — reproducible backend image (`uvicorn main:app --port 8000`).
 - **`render.yaml`** — Render blueprint (free tier, `$PORT` aware).
 - **`DB_PATH`** is configurable via `RECLAIM_DB_PATH` (defaults to `backend/reclaim.db`),
@@ -488,7 +519,7 @@ Razorpay/
 │   ├── vite.config.js           # Dev server + /api proxy config
 │   ├── package.json
 │   └── index.html
-├── .env.example                 # Optional GEMINI_API_KEY config template
+├── .env.example                 # Optional GEMINI_API_KEY + Razorpay TEST keys config template
 ├── Dockerfile                   # Backend container image
 ├── render.yaml                  # Render deployment blueprint
 ├── start_all.ps1                # One-click launcher (both servers)

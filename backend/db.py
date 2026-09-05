@@ -57,7 +57,8 @@ def init_db():
         cur.execute("""
             CREATE TABLE IF NOT EXISTS messages (
                 transaction_id TEXT PRIMARY KEY,
-                message TEXT, channel TEXT, subject TEXT
+                message TEXT, channel TEXT, subject TEXT,
+                payment_link_id TEXT, payment_link_url TEXT, payment_link_source TEXT
             )
         """)
         cur.execute("""
@@ -101,7 +102,18 @@ def init_db():
             )
         """)
         conn.commit()
+        _migrate(conn)
         conn.close()
+
+
+def _migrate(conn) -> None:
+    """Forward-migrate older database files (added columns, etc.)."""
+    for column in ("payment_link_id", "payment_link_url", "payment_link_source"):
+        try:
+            conn.execute(f"ALTER TABLE messages ADD COLUMN {column} TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already exists
+    conn.commit()
 
 
 def log_audit(transaction_id: str, stage: str, source: str, detail: dict):
@@ -164,9 +176,12 @@ def upsert_message(m) -> None:
     with _lock:
         conn = _conn()
         conn.execute(
-            """INSERT OR REPLACE INTO messages (transaction_id, message, channel, subject)
-               VALUES (?,?,?,?)""",
-            (m.transaction_id, m.message, m.channel, m.subject),
+            """INSERT OR REPLACE INTO messages
+               (transaction_id, message, channel, subject,
+                payment_link_id, payment_link_url, payment_link_source)
+               VALUES (?,?,?,?,?,?,?)""",
+            (m.transaction_id, m.message, m.channel, m.subject,
+             m.payment_link_id, m.payment_link_url, m.payment_link_source),
         )
         conn.commit()
         conn.close()

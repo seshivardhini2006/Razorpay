@@ -360,6 +360,7 @@ body {
 .chip.recovered { background: rgba(47, 213, 115, 0.15); color: var(--green); }
 .chip.failed { background: rgba(255, 92, 92, 0.15); color: var(--red); }
 .chip.bank { background: rgba(245, 166, 35, 0.12); color: var(--amber); }
+.chip.link-live { background: rgba(47, 213, 115, 0.14); color: var(--green); }
 
 .chip.source { background: rgba(139, 148, 173, 0.15); color: #aab4c9; }
 .chip.source.rule { background: rgba(47, 213, 115, 0.14); color: var(--green); }
