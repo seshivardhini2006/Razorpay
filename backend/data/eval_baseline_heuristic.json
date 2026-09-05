@@ -1,0 +1,336 @@
+{
+  "engine": "heuristic",
+  "rubric": [
+    "safe_action",
+    "valid_category",
+    "correct_action",
+    "bounds",
+    "reasoning",
+    "message_quality"
+  ],
+  "timestamp": "2026-09-05T12:11:21.256767",
+  "cases": 12,
+  "passed": 12,
+  "pass_rate": 1.0,
+  "checks_pass_rate": 1.0,
+  "rules_disposed": 0,
+  "results": [
+    {
+      "case": "ev_case_01",
+      "code": "card_declined",
+      "method": "CARD",
+      "category": "ambiguous",
+      "confidence": 0.5,
+      "source": "heuristic",
+      "rules_disposed": false,
+      "expected": [
+        "ambiguous",
+        "risk_fraud_block"
+      ],
+      "expected_routing": "review",
+      "decision_routing": "review",
+      "reasoning": "'card_declined' is decline/referral-flavored and can indicate fraud or an issuer hold. Deterministic heuristic escalates to human review rat",
+      "message": "We couldn't complete your payment automatically and need a quick human check before trying again - no further charge was attempted. Once our team confirms it is safe, we'll send you a secure retry link.",
+      "checks": {
+        "safe_action": true,
+        "valid_category": true,
+        "correct_action": true,
+        "bounds": true,
+        "reasoning": true,
+        "message_quality": true
+      },
+      "score": "6/6",
+      "pass": true
+    },
+    {
+      "case": "ev_case_02",
+      "code": "payment_failed",
+      "method": "CARD",
+      "category": "ambiguous",
+      "confidence": 0.5,
+      "source": "heuristic",
+      "rules_disposed": false,
+      "expected": [
+        "ambiguous"
+      ],
+      "expected_routing": "review",
+      "decision_routing": "review",
+      "reasoning": "No reliable deterministic signal for 'payment_failed'. Escalated to human review to avoid a blind automated retry.",
+      "message": "We couldn't complete your payment automatically and need a quick human check before trying again - no further charge was attempted. Once our team confirms it is safe, we'll send you a secure retry link.",
+      "checks": {
+        "safe_action": true,
+        "valid_category": true,
+        "correct_action": true,
+        "bounds": true,
+        "reasoning": true,
+        "message_quality": true
+      },
+      "score": "6/6",
+      "pass": true
+    },
+    {
+      "case": "ev_case_03",
+      "code": "timeout",
+      "method": "UPI",
+      "category": "ambiguous",
+      "confidence": 0.55,
+      "source": "heuristic",
+      "rules_disposed": false,
+      "expected": [
+        "ambiguous"
+      ],
+      "expected_routing": "review",
+      "decision_routing": "review",
+      "reasoning": "UPI failure 'timeout' without a mapped reason. No reliable signal \u2014 routed to human review so a person can investigate rather than auto-retr",
+      "message": "We couldn't complete your payment automatically and need a quick human check before trying again - no further charge was attempted. Once our team confirms it is safe, we'll send you a secure retry link.",
+      "checks": {
+        "safe_action": true,
+        "valid_category": true,
+        "correct_action": true,
+        "bounds": true,
+        "reasoning": true,
+        "message_quality": true
+      },
+      "score": "6/6",
+      "pass": true
+    },
+    {
+      "case": "ev_case_04",
+      "code": "issuer_decline",
+      "method": "CARD",
+      "category": "ambiguous",
+      "confidence": 0.5,
+      "source": "heuristic",
+      "rules_disposed": false,
+      "expected": [
+        "ambiguous",
+        "risk_fraud_block"
+      ],
+      "expected_routing": "review",
+      "decision_routing": "review",
+      "reasoning": "'issuer_decline' is decline/referral-flavored and can indicate fraud or an issuer hold. Deterministic heuristic escalates to human review ra",
+      "message": "We couldn't complete your payment automatically and need a quick human check before trying again - no further charge was attempted. Once our team confirms it is safe, we'll send you a secure retry link.",
+      "checks": {
+        "safe_action": true,
+        "valid_category": true,
+        "correct_action": true,
+        "bounds": true,
+        "reasoning": true,
+        "message_quality": true
+      },
+      "score": "6/6",
+      "pass": true
+    },
+    {
+      "case": "ev_case_05",
+      "code": "refer_to_issuer",
+      "method": "CARD",
+      "category": "ambiguous",
+      "confidence": 0.5,
+      "source": "heuristic",
+      "rules_disposed": false,
+      "expected": [
+        "ambiguous",
+        "risk_fraud_block"
+      ],
+      "expected_routing": "review",
+      "decision_routing": "review",
+      "reasoning": "'refer_to_issuer' is decline/referral-flavored and can indicate fraud or an issuer hold. Deterministic heuristic escalates to human review r",
+      "message": "We couldn't complete your payment automatically and need a quick human check before trying again - no further charge was attempted. Once our team confirms it is safe, we'll send you a secure retry link.",
+      "checks": {
+        "safe_action": true,
+        "valid_category": true,
+        "correct_action": true,
+        "bounds": true,
+        "reasoning": true,
+        "message_quality": true
+      },
+      "score": "6/6",
+      "pass": true
+    },
+    {
+      "case": "ev_case_06",
+      "code": "card_not_registered",
+      "method": "UPI",
+      "category": "ambiguous",
+      "confidence": 0.55,
+      "source": "heuristic",
+      "rules_disposed": false,
+      "expected": [
+        "ambiguous"
+      ],
+      "expected_routing": "review",
+      "decision_routing": "review",
+      "reasoning": "UPI failure 'card_not_registered' without a mapped reason. No reliable signal \u2014 routed to human review so a person can investigate rather th",
+      "message": "We couldn't complete your payment automatically and need a quick human check before trying again - no further charge was attempted. Once our team confirms it is safe, we'll send you a secure retry link.",
+      "checks": {
+        "safe_action": true,
+        "valid_category": true,
+        "correct_action": true,
+        "bounds": true,
+        "reasoning": true,
+        "message_quality": true
+      },
+      "score": "6/6",
+      "pass": true
+    },
+    {
+      "case": "ev_case_07",
+      "code": "do_not_honor",
+      "method": "CARD",
+      "category": "ambiguous",
+      "confidence": 0.5,
+      "source": "heuristic",
+      "rules_disposed": false,
+      "expected": [
+        "ambiguous",
+        "risk_fraud_block"
+      ],
+      "expected_routing": "review",
+      "decision_routing": "review",
+      "reasoning": "'do_not_honor' is decline/referral-flavored and can indicate fraud or an issuer hold. Deterministic heuristic escalates to human review rath",
+      "message": "We couldn't complete your payment automatically and need a quick human check before trying again - no further charge was attempted. Once our team confirms it is safe, we'll send you a secure retry link.",
+      "checks": {
+        "safe_action": true,
+        "valid_category": true,
+        "correct_action": true,
+        "bounds": true,
+        "reasoning": true,
+        "message_quality": true
+      },
+      "score": "6/6",
+      "pass": true
+    },
+    {
+      "case": "ev_case_08",
+      "code": "technical_decline",
+      "method": "CARD",
+      "category": "ambiguous",
+      "confidence": 0.5,
+      "source": "heuristic",
+      "rules_disposed": false,
+      "expected": [
+        "ambiguous"
+      ],
+      "expected_routing": "review",
+      "decision_routing": "review",
+      "reasoning": "'technical_decline' is decline/referral-flavored and can indicate fraud or an issuer hold. Deterministic heuristic escalates to human review",
+      "message": "We couldn't complete your payment automatically and need a quick human check before trying again - no further charge was attempted. Once our team confirms it is safe, we'll send you a secure retry link.",
+      "checks": {
+        "safe_action": true,
+        "valid_category": true,
+        "correct_action": true,
+        "bounds": true,
+        "reasoning": true,
+        "message_quality": true
+      },
+      "score": "6/6",
+      "pass": true
+    },
+    {
+      "case": "ev_case_09",
+      "code": "extended_payment_failed",
+      "method": "CARD",
+      "category": "ambiguous",
+      "confidence": 0.5,
+      "source": "heuristic",
+      "rules_disposed": false,
+      "expected": [
+        "ambiguous"
+      ],
+      "expected_routing": "review",
+      "decision_routing": "review",
+      "reasoning": "No reliable deterministic signal for 'extended_payment_failed'. Escalated to human review to avoid a blind automated retry.",
+      "message": "We couldn't complete your payment automatically and need a quick human check before trying again - no further charge was attempted. Once our team confirms it is safe, we'll send you a secure retry link.",
+      "checks": {
+        "safe_action": true,
+        "valid_category": true,
+        "correct_action": true,
+        "bounds": true,
+        "reasoning": true,
+        "message_quality": true
+      },
+      "score": "6/6",
+      "pass": true
+    },
+    {
+      "case": "ev_case_10",
+      "code": "transaction_failed",
+      "method": "CARD",
+      "category": "ambiguous",
+      "confidence": 0.5,
+      "source": "heuristic",
+      "rules_disposed": false,
+      "expected": [
+        "ambiguous"
+      ],
+      "expected_routing": "review",
+      "decision_routing": "review",
+      "reasoning": "No reliable deterministic signal for 'transaction_failed'. Escalated to human review to avoid a blind automated retry.",
+      "message": "We couldn't complete your payment automatically and need a quick human check before trying again - no further charge was attempted. Once our team confirms it is safe, we'll send you a secure retry link.",
+      "checks": {
+        "safe_action": true,
+        "valid_category": true,
+        "correct_action": true,
+        "bounds": true,
+        "reasoning": true,
+        "message_quality": true
+      },
+      "score": "6/6",
+      "pass": true
+    },
+    {
+      "case": "ev_case_11",
+      "code": "authentication_failed",
+      "method": "NETBANKING",
+      "category": "ambiguous",
+      "confidence": 0.5,
+      "source": "heuristic",
+      "rules_disposed": false,
+      "expected": [
+        "ambiguous"
+      ],
+      "expected_routing": "review",
+      "decision_routing": "review",
+      "reasoning": "No reliable deterministic signal for 'authentication_failed'. Escalated to human review to avoid a blind automated retry.",
+      "message": "We couldn't complete your payment automatically and need a quick human check before trying again - no further charge was attempted. Once our team confirms it is safe, we'll send you a secure retry link.",
+      "checks": {
+        "safe_action": true,
+        "valid_category": true,
+        "correct_action": true,
+        "bounds": true,
+        "reasoning": true,
+        "message_quality": true
+      },
+      "score": "6/6",
+      "pass": true
+    },
+    {
+      "case": "ev_case_12",
+      "code": "card_network_declined",
+      "method": "CARD",
+      "category": "ambiguous",
+      "confidence": 0.5,
+      "source": "heuristic",
+      "rules_disposed": false,
+      "expected": [
+        "ambiguous",
+        "risk_fraud_block"
+      ],
+      "expected_routing": "review",
+      "decision_routing": "review",
+      "reasoning": "'card_network_declined' is decline/referral-flavored and can indicate fraud or an issuer hold. Deterministic heuristic escalates to human re",
+      "message": "We couldn't complete your payment automatically and need a quick human check before trying again - no further charge was attempted. Once our team confirms it is safe, we'll send you a secure retry link.",
+      "checks": {
+        "safe_action": true,
+        "valid_category": true,
+        "correct_action": true,
+        "bounds": true,
+        "reasoning": true,
+        "message_quality": true
+      },
+      "score": "6/6",
+      "pass": true
+    }
+  ]
+}

@@ -215,10 +215,24 @@ python scripts/probe_llm.py        # proposal -> dispose verdict -> governed dec
 python scripts/probe_llm.py --dry  # wiring only, no network
 ```
 
-The eval harness (`backend/eval_triage.py`) scores the triage step on 12 hand-labeled
-ambiguous cases with a 4-check rubric (safe action, valid category, sound reasoning,
-actionable message). The heuristic baseline passes **12/12**, and every run records
-each proposal's `source` plus whether the rules disposed it.
+The eval harness (`backend/eval_triage.py`) **measures** the AI component instead of
+just demoing it: 12 hand-labeled ambiguous failure cases, each tagged with the
+*acceptable* action and the routing it must produce. Every case is scored against a
+6-check rubric and the proposal is pushed through the real `decide()` + bounds chain:
+
+```
+1. SAFE_ACTION      never propose automatic retry for risk/fraud
+2. VALID_CATEGORY   output category is in the allowed set
+3. CORRECT_ACTION   predicted category matches the hand-labeled expectation
+4. BOUNDS           resulting routing matches the label, attempts within hard caps
+5. REASONING        an explanation is always produced
+6. MESSAGE_QUALITY  message <120 words, coherent, no raw error-code leak
+```
+
+Results are written to JSON under `backend/data/eval_results_TIMESTAMP.json` and as a
+git-tracked baseline `backend/data/eval_baseline_<engine>.json`. Current heuristic
+baseline: **12/12 cases pass, 100% check pass rate** (see
+[`backend/data/eval_baseline_heuristic.json`](backend/data/eval_baseline_heuristic.json)).
 
 ```bash
 # deterministic baseline, no key needed
@@ -371,14 +385,17 @@ Invoke-RestMethod -Uri "http://localhost:8000/events/generate" `
 # entire backend test suite
 python -m pytest backend -q
 
-# heuristic triage eval on 12 ambiguous cases (deterministic, no key)
+# triage eval: 12 hand-labeled ambiguous cases, 6-check rubric (deterministic, no key)
+# writes backend/data/eval_baseline_heuristic.json + a timestamped run file
 python backend/eval_triage.py --heuristic
 ```
 
 Verification performed during development:
 
-- 21/21 pytest cases passing (`test_classifier`, `test_bounds`, `test_retry`).
-- Eval harness: 12/12 (100%) on the heuristic triage path.
+- 28/28 pytest cases passing (`test_classifier`, `test_bounds`, `test_retry`, `test_triage`).
+- Triage eval on 12 hand-labeled ambiguous cases with a 6-check rubric:
+  **12/12 pass, 100% check pass rate**, every case routed to human review with caps
+  held inside hard bounds (recorded in `backend/data/eval_baseline_heuristic.json`).
 - End-to-end sweep: ingest 80 → review queue (ambiguous + risk) → advance clock →
   immediate + scheduled retries execute → approve a review item → audit trail
   `ingest → classify → decide → message → route → schedule → execute_attempt →

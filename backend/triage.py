@@ -52,8 +52,8 @@ RISK_SIGNALS = ("declin", "do_not_honor", "refer", "block", "risk", "fraud")
 _HEURISTIC_MESSAGES = {
     "ambiguous": (
         "We couldn't complete your payment automatically and need a quick human check "
-        "before trying again - no further charge was attempted. You'll get a secure "
-        "retry link from our team once it's confirmed safe. (Safe by default.)"
+        "before trying again - no further charge was attempted. Once our team confirms it "
+        "is safe, we'll send you a secure retry link."
     ),
     "bank_server_downtime": (
         "Your bank's server was briefly unavailable during the transaction - this kind of "
