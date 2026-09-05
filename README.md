@@ -347,39 +347,52 @@ late policy changes can never cause an unsafe retry.
 
 ### Quick Start
 
-**1. Install dependencies**
+**1. Install dependencies** (fresh clone; the venv is local & gitignored)
 
 ```powershell
-# Backend (into project venv)
-..\venv\Scripts\pip install -r backend\requirements.txt
+# Backend
+python -m venv venv
+venv\Scripts\pip install -r backend\requirements.txt
 ```
 
 ```powershell
 # Frontend
 cd frontend
 npm install
+cd ..
 ```
 
-**2. Start the backend (FastAPI → :8000)**
+**2. Start both servers (one command)**
 
 ```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force   # only if PowerShell blocks scripts
+.\start_all.ps1
+```
+
+Or manually (two terminals):
+
+```powershell
+# terminal 1 — backend (FastAPI → :8000)
 cd backend
 ..\venv\Scripts\python -m uvicorn main:app --port 8000
 ```
 
-**3. Start the frontend (Vite + React → :5173)**
-
 ```powershell
+# terminal 2 — frontend (Vite + React → :5173)
 cd frontend
 npm run dev
 ```
 
-**4. Open the dashboard**
+**3. Open the dashboard**
 
 Visit **http://localhost:5173** and click **⚡ Stream failure events** to watch
 Reclaim diagnose, decide, and recover failed payments — then use the **sim clock**
 (＋2h / ＋12h / ＋1 day) to fast-forward retries and watch the recovered-revenue
-counter tick up against the blind-retry baseline.
+counter tick up against the blind-retry baseline. API docs live at
+**http://localhost:8000/docs**.
+
+**No servers? Just the pipeline:** `python scripts/demo.py` runs the whole lifecycle
+in the terminal with zero setup — even the API is optional.
 
 ### No API keys? It still runs.
 
