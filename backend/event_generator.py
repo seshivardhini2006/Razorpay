@@ -22,43 +22,46 @@ MERCHANTS = [
     ("merch_005", "Streamly Media"),
 ]
 
-# error code + human-readable Razorpay-style failure reason, per category
+# error code + human-readable Razorpay-style failure reason — ALL codes are
+# drawn from Razorpay's official documented failure codes
+# (docs/errors/payments/list and docs/errors/payments/cards).
 ERROR_POOL = {
     "insufficient_funds": [
         ("insufficient_funds", "Insufficient funds in the account"),
-        ("insufficient_balance", "Account balance is below the transaction amount"),
-        ("low_balance", "Low balance at the time of debit"),
+        ("transaction_limit_exceeded", "Credit/debit limit exceeded on the card"),
+        ("credit_limit_exceeded", "Credit limit for the customer has been exceeded"),
     ],
     "bank_server_downtime": [
-        ("bank_timeout", "Bank could not respond in time"),
-        ("bank_unavailable", "Bank is currently unavailable"),
-        ("host_time_out", "Host response timed out"),
         ("bank_technical_error", "Technical error at the issuing bank"),
+        ("bank_not_available", "Bank is not available due to a downtime or a technical issue"),
+        ("gateway_technical_error", "Downtime on a partner bank"),
+        ("server_error", "Technical error at Razorpay's server"),
     ],
     "otp_timeout": [
         ("otp_expired", "OTP expired before verification"),
-        ("otp_timeout", "OTP verification timed out"),
+        ("otp_attempts_exceeded", "OTP attempts have been exceeded"),
     ],
     "wrong_cvv_pin": [
-        ("invalid_cvv", "Incorrect CVV entered"),
-        ("invalid_pin", "Incorrect UPI PIN entered"),
-        ("invalid_otp", "OTP entered was incorrect"),
+        ("incorrect_cvv", "Incorrect CVV entered"),
+        ("incorrect_pin", "Incorrect PIN entered"),
+        ("incorrect_otp", "Incorrect OTP entered"),
     ],
     "expired_card": [
         ("card_expired", "Card has expired"),
     ],
     "network_drop": [
-        ("network_failure", "Network failure during transaction"),
-        ("connection_timeout", "Connection timed out"),
+        ("request_timed_out", "The request has timed out"),
+        ("payment_timed_out", "Payment exceeded the processing time limit"),
     ],
     "risk_fraud_block": [
-        ("risk_blocked", "Transaction flagged as risky by fraud engine"),
-        ("fraud_blocked", "Fraud engine blocked the transaction"),
+        ("payment_risk_check_failed", "Transaction declined due to fraud risk checks"),
+        ("compliance_violation", "The payment violates compliance requirements"),
+        ("debit_instrument_blocked", "The card is blocked by the issuer or customer"),
     ],
     "ambiguous": [
         ("card_declined", "Card declined by the bank"),
-        ("payment_failed", "Payment could not be processed"),
-        ("timeout", "Transaction timed out"),
+        ("payment_failed", "Payment processing failed at the bank or gateway"),
+        ("authentication_failed", "Authentication (3DS/OTP) failed"),
     ],
 }
 

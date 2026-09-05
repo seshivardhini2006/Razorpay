@@ -164,26 +164,41 @@ unlike conventional dunning tools that are reason-blind and channel-generic.
 
 ## Failure Taxonomy & Retry Policies
 
-The taxonomy of documented-style failure codes lives in
-`backend/data/razorpay_error_reasons.json` (~70 codes across categories, each tagged
-with its source of truth: *Documented code* / *Observed in outage* / *Legacy alias* /
-*Inferred*). Categories with intentionally *ambiguous* codes route to the triage layer.
+The failure taxonomy lives in `backend/data/razorpay_error_reasons.json` and is
+**grounded in Razorpay's official published failure codes** — not an invented subset.
+Every one of the **112 rules** maps an `error_reason` that Razorpay actually
+documents ([List of Errors](https://razorpay.com/docs/errors/payments/list/) —
+Bad Request + Gateway errors — and
+[Cards Error Codes](https://razorpay.com/docs/errors/payments/cards/)) into a
+Reclaim recovery category via a `doc` slug + a note quoting the documented meaning.
+Codes that are customer/bank-actionable map to a concrete strategy; codes that are
+business/request-level or genuinely unknown map to `ambiguous` (triage → human
+review, never a blind auto-retry). Provenance is machine-checkable:
+
+```powershell
+python backend/check_taxonomy.py
+# -> TAXONOMY OK — 112 rules grounded in errors/payments/cards, errors/payments/list
+```
+
+Categories with intentionally *ambiguous* codes route to the triage layer.
 
 Every category maps to a distinct recovery strategy in `backend/policies.py`:
 
-| Reason | Sample Error Codes | Retry Timing | Channel Strategy | Max |
+| Reason | Documented error codes (Razorpay) | Retry Timing | Channel Strategy | Max |
 |---|---|---|---|---|
-| Insufficient Funds | `low_balance`, `insufficient_funds` | Scheduled (next day) | Same method | 3 |
-| Bank Server Downtime | `bank_unreachable`, `gateway_timeout` | Short delay (15 min) | Same method | 3 |
-| OTP Timeout | `otp_expired`, `otp_delivery_failed` | Immediate | Same method | 2 |
-| Wrong CVV/PIN | `wrong_cvv`, `invalid_pin` | Immediate | Same method | 2 |
-| Network Drop | `connection_dropped`, `network_issue` | Immediate | Same method | 2 |
-| Expired Card | `card_expired` | No blind retry | **Prompt for new card** | 0 |
-| Risk / Fraud Block | `risk_blocked`, `fraud_suspected` | No retry | **Human review** | 0 |
-| Needs Triage | *(ambiguous codes)* | No auto retry | **Human review** | 0 |
+| Insufficient Funds | `insufficient_funds`, `transaction_limit_exceeded`, `credit_limit_exceeded`, `transaction_daily_limit_exceeded` | Scheduled (next day) | Same method | 3 |
+| Bank Server Downtime | `bank_technical_error`, `bank_not_available`, `gateway_technical_error`, `server_error`, `bank_cutoff_in_progress` | Short delay (15 min) | Same method | 3 |
+| OTP Timeout | `otp_expired`, `otp_attempts_exceeded` | Immediate | Same method | 2 |
+| Wrong CVV/PIN | `incorrect_cvv`, `incorrect_pin`, `incorrect_otp`, `incorrect_atm_pin` | Immediate | Same method | 2 |
+| Network Drop | `request_timed_out`, `vpa_resolution_failed`, `payment_timed_out` | Immediate | Same method | 2 |
+| Expired Card | `card_expired`, `incorrect_card_expiry_date` | No blind retry | **Prompt for new card** | 0 |
+| Risk / Fraud Block | `payment_risk_check_failed`, `compliance_violation`, `debit_instrument_blocked` | No retry | **Human review** | 0 |
+| Needs Triage | `card_declined`, `payment_failed`, `authentication_failed`, `payment_cancelled`, *(other ambiguous)* | No auto retry | **Human review** | 0 |
 
-Per-merchant overrides (attempt caps, sensitivity, risky auto-retry toggle, message
-channel) are stored in SQLite and exposed via `GET/PUT /merchants/{id}`.
+The demo's synthetic events (`backend/event_generator.py`) only emit codes from this
+documented table, so every record in the dashboard traces to a real Razorpay error
+reason. Per-merchant overrides (attempt caps, sensitivity, risky auto-retry toggle,
+message channel) are stored in SQLite and exposed via `GET/PUT /merchants/{id}`.
 
 ## The Triage Layer (LLM + Evals)
 
@@ -527,6 +542,7 @@ Razorpay/
 │   ├── models.py                # Typed data schemas
 │   ├── razorpay_payments.py     # Real (test-mode) Payment Links + offline mock
 │   ├── check_cold_start.py      # No-keys proof: pipeline runs with zero config
+│   ├── check_taxonomy.py        # Taxonomy provenance: codes trace to Razorpay docs
 │   ├── eval_triage.py           # LLM/heuristic eval harness (rubric-scored)
 │   ├── data/
 │   │   ├── razorpay_error_reasons.json   # Failure taxonomy

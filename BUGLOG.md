@@ -165,3 +165,25 @@ Verified end-to-end with every credential var stripped from the environment:
 
 **Locked in:** `backend/check_cold_start.py` (7 checks, all PASS) + README
 "No API keys? It still runs." section. Full suite 34/34 passing.
+
+---
+
+## 2026-09-05 — taxonomy grounded in Razorpay's real documented failure codes
+
+**Symptom:** the failure table (`razorpay_error_reasons.json`) read as *hand-picked for
+the demo* — codes like `low_balance`, `bank_timeout`, `risk_blocked` looked plausible
+but weren't traceable to a real Razorpay API list, and the README called it
+"documented-style".
+
+**Fix:** rebuilt the taxonomy from Razorpay's actual published pages —
+`docs/errors/payments/list` (Bad Request + Gateway error reasons) and
+`docs/errors/payments/cards` — and mapped **every** listed `error_reason` into one of
+Reclaim's 8 recovery categories. Each of the 112 rules now carries:
+- `doc` — the exact docs slug it came from;
+- `note` — the documented meaning (not an invented gloss);
+- a category + confidence reflecting how recoverable the doc description is.
+
+The demo's event generator was switched to emit only these documented codes (the
+`insufficient_balance` / `bank_timeout` / `risk_blocked` pseudo-codes are gone), so
+every dashboard record traces to a real Razorpay error reason. Provenance is enforced
+by `backend/check_taxonomy.py` (7 checks, all PASS). Suite still 34/34.
