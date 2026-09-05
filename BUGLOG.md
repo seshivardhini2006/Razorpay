@@ -142,3 +142,26 @@ audit stage. Three-way graceful degradation: no keys → offline mock, success �
 `source=razorpay`, API failure → `None` (plain template, never a fake link). Events stay
 synthetic. Covered by 5 new tests in `backend/tests/test_payment_links.py` (> real
 request shape, Basic auth, failure fallback); suite now 34/34 passing.
+
+---
+
+## 2026-09-05 — no-keys cold start must never dead-end a judge
+
+**Concern:** anyone cloning and running the repo without `.env` could hit a wall in
+three places — an LLM triage call that demands `GEMINI_API_KEY`, a Payment Link step
+that demands `RAZORPAY_TEST_KEY_ID`/`_SECRET`, and unlabeled decisions that make the
+failover invisible.
+
+**Status:** all three were already built as two-branch fallbacks and nothing loads
+`.env` at all (env is read via `os.environ`), so cold start is inherently safe.
+Verified end-to-end with every credential var stripped from the environment:
+
+- ambiguous failure codes → deterministic heuristic default action + template
+  message (`source=heuristic`), never a dead API call;
+- completion flows → offline mock payment link (`source=offline`);
+- every classification/decision/link row is tagged `rule | heuristic | llm | human |
+  simulation`, so the exact engine that produced each record is queryable;
+- a failed LLM call (bad key / network) degrades to the heuristic, never a 500.
+
+**Locked in:** `backend/check_cold_start.py` (7 checks, all PASS) + README
+"No API keys? It still runs." section. Full suite 34/34 passing.

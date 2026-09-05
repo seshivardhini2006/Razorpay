@@ -346,6 +346,29 @@ Reclaim diagnose, decide, and recover failed payments — then use the **sim clo
 (＋2h / ＋12h / ＋1 day) to fast-forward retries and watch the recovered-revenue
 counter tick up against the blind-retry baseline.
 
+### No API keys? It still runs.
+
+There is **no hard dependency on any API key**. Cloning the repo, starting it, and
+driving the dashboard works with **zero configuration** — no `.env` file needed.
+
+| Step | With keys | No keys (cold start) |
+|------|-----------|----------------------|
+| LLM triage (ambiguous codes) | real Gemini call (`source=llm`) | deterministic heuristic + template message (`source=heuristic`) |
+| Payment links (completion flows) | real Razorpay test-mode link (`source=razorpay`) | offline mock link (`source=offline`) |
+| Recovery demo / eval harness | `--llm` / live path | heuristic baseline (`--heuristic`, fully deterministic) |
+
+Every classification, decision, and link is **tagged with the engine that produced it**
+(`rule` / `heuristic` / `llm` / `human` / `simulation`), so nothing is ever mislabeled —
+a heuristic verdict is recorded as `heuristic`, not `llm`. Official cold-start proof:
+
+```powershell
+python backend/check_cold_start.py
+# -> processed: 40 | source tags: {heuristic, rule} | links: {offline: N} | COLD-START OK
+```
+
+The script strips every `GEMINI*` / `RAZORPAY*` / `RECLAIM_*` variable, runs the full
+pipeline into a throwaway database, and asserts the fallbacks fired.
+
 ### Optional LLM triage
 
 ```powershell
@@ -502,11 +525,13 @@ Razorpay/
 │   ├── simclock.py              # Fast-forwardable simulated clock
 │   ├── db.py                    # SQLite persistence + append-only audit trail
 │   ├── models.py                # Typed data schemas
+│   ├── razorpay_payments.py     # Real (test-mode) Payment Links + offline mock
+│   ├── check_cold_start.py      # No-keys proof: pipeline runs with zero config
 │   ├── eval_triage.py           # LLM/heuristic eval harness (rubric-scored)
 │   ├── data/
 │   │   ├── razorpay_error_reasons.json   # Failure taxonomy
 │   │   └── eval_results_*.json           # Eval run outputs
-│   ├── tests/                   # pytest suite (classifier, bounds, retry)
+│   ├── tests/                   # pytest suite (classifier, bounds, retry, payment links, triage)
 │   └── requirements.txt
 ├── scripts/
 │   ├── demo.py                  # Terminal demo of the full recovery lifecycle
