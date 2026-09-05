@@ -7,10 +7,16 @@
 - This module handles the ambiguous bucket: generic declines, 'payment_failed',
   'card_declined' with no bank detail, unmapped codes — where context (amount,
   method, bank, reason string) matters.
-  - With `GEMINI_API_KEY` set, the LLM (Gemini REST) proposes a category — which
-    maps to a retry strategy via the policy table — AND drafts the customer-facing
-    recovery message.
-  - Without a key, a deterministic heuristic produces the same-shaped proposal.
+
+Control flow (deliberately the two-branch shape below):
+
+    if GEMINI_API_KEY set:
+        call the real LLM (Gemini REST)
+        parse its JSON response  -> category/strategy + drafted customer message
+    else:
+        deterministic heuristic -> reasonable default action (category/strategy)
+                                   + a template message for that case
+
 - Either way the proposal passes through `apply_rules_dispose()`, which makes hard
   safety decisions IN CODE regardless of what the AI said:
     * category must be in the allowed set, else -> ambiguous
@@ -18,7 +24,7 @@
       auto-retry proposal -> ambiguous (human review)
     * UPI is never blind auto-retried -> ambiguous
   When rules dispose a proposal, the drafted message is discarded too and the
-  deterministic template takes over. Engine + bounds.py enforce the caps/cooldowns
+  downstream template takes over. Engine + bounds.py enforce the caps/cooldowns
   on every executed attempt afterwards.
 """
 
@@ -40,65 +46,70 @@ ALLOWED_CATEGORIES = {
 # Deterministic signals that always overrule an AI proposal. Independent of the LLM.
 RISK_SIGNALS = ("declin", "do_not_honor", "refer", "block", "risk", "fraud")
 
-# Heuristic keywords that signal a safe-to-attempt transient failure.
-_SAFE_TO_HANDLE = ("timeout", "unavailable", "gateway", "failed", "connection", "network", "transaction")
+# Template customer messages per heuristic default action. The heuristic picks a
+# reasonable default action (category) and returns the matching template message,
+# so the no-key path is never silent.
+_HEURISTIC_MESSAGES = {
+    "ambiguous": (
+        "We couldn't complete your payment automatically and need a quick human check "
+        "before trying again - no further charge was attempted. You'll get a secure "
+        "retry link from our team once it's confirmed safe. (Safe by default.)"
+    ),
+    "bank_server_downtime": (
+        "Your bank's server was briefly unavailable during the transaction - this kind of "
+        "issue almost always clears up on its own. We'll retry your payment automatically "
+        "in about 15 minutes; no action needed from you."
+    ),
+    "network_drop": (
+        "Your payment hit a temporary network hiccup. Tap below to securely retry - it "
+        "typically goes through on the next attempt."
+    ),
+}
+
+
+def _heuristic_verdict(category: str, confidence: float, explanation: str) -> dict:
+    """A heuristic default action (category) + its template customer message."""
+    return {
+        "category": category,
+        "confidence": confidence,
+        "explanation": explanation,
+        "message": _HEURISTIC_MESSAGES.get(category, _HEURISTIC_MESSAGES["ambiguous"]),
+    }
 
 
 def _heuristic_triage(event) -> dict:
+    """Deterministic heuristic: pick a reasonable default action + template message."""
     code = (event.error_code or "").lower()
     reason = (event.reason or "").lower()
 
     if event.payment_method in ("UPI", "upi"):
-        return {
-            "category": "ambiguous",
-            "confidence": 0.55,
-            "explanation": (
-                f"UPI failure '{code}' without a mapped reason. No reliable signal — routed "
-                "to human review so a person can investigate rather than auto-retry blind."
-            ),
-        }
+        return _heuristic_verdict(
+            "ambiguous", 0.55,
+            f"UPI failure '{code}' without a mapped reason. No reliable signal — routed "
+            "to human review so a person can investigate rather than auto-retry blind.",
+        )
 
     # Risk-sensitive codes (declines / do-not-honor / referrals) can indicate fraud.
     # Never auto-retry these; route to human review.
     if any(term in code for term in RISK_SIGNALS):
-        return {
-            "category": "ambiguous",
-            "confidence": 0.5,
-            "explanation": (
-                f"'{code}' is decline/referral-flavored and can indicate fraud or an issuer "
-                "hold. Deterministic heuristic escalates to human review rather than auto-retry."
-            ),
-        }
+        return _heuristic_verdict(
+            "ambiguous", 0.5,
+            f"'{code}' is decline/referral-flavored and can indicate fraud or an issuer "
+            "hold. Deterministic heuristic escalates to human review rather than auto-retry.",
+        )
 
     if "timeout" in code or "time" in reason:
-        return {
-            "category": "bank_server_downtime" if event.amount < 20000 else "network_drop",
-            "confidence": 0.6,
-            "explanation": (
-                "Ambiguous timeout code; higher-value transactions bias toward network drop, "
-                "lower-value toward bank-side downtime. Deterministic heuristic (no LLM key)."
-            ),
-        }
+        return _heuristic_verdict(
+            "bank_server_downtime" if event.amount < 20000 else "network_drop", 0.6,
+            "Ambiguous timeout code; higher-value transactions bias toward network drop, "
+            "lower-value toward bank-side downtime. Deterministic heuristic (no LLM key).",
+        )
 
-    if not any(term in code for term in _SAFE_TO_HANDLE):
-        return {
-            "category": "ambiguous",
-            "confidence": 0.5,
-            "explanation": (
-                f"No reliable deterministic signal for '{code}'. Escalated to human review to "
-                "avoid a blind automated retry."
-            ),
-        }
-
-    # Conservative default: escalate for a human, never auto-retry blind.
-    return {
-        "category": "ambiguous",
-        "confidence": 0.5,
-        "explanation": (
-            f"No reliable deterministic signal for '{code}'. Escalated to human review to "
-            "avoid a blind automated retry."
-        ),
-    }
+    return _heuristic_verdict(
+        "ambiguous", 0.5,
+        f"No reliable deterministic signal for '{code}'. Escalated to human review to "
+        "avoid a blind automated retry.",
+    )
 
 
 def _llm_triage(event) -> dict:
@@ -209,13 +220,21 @@ def apply_rules_dispose(proposal: dict, event) -> dict:
 def triage(event) -> dict:
     """Return a judgment proposal for an ambiguous failure.
 
-    LLM when keyed (real API call), else deterministic heuristic. Either way the
-    result is validated by the rules-dispose gate before being returned.
-    """
-    result = _llm_triage(event)
-    if result is not None:
-        result["source"] = SRC_LLM
+    if GEMINI_API_KEY set:
+        call the real LLM, parse its response  (source=llm)
     else:
-        result = _heuristic_triage(event)
-        result["source"] = SRC_HEURISTIC
+        deterministic heuristic -> default action + template message (source=heuristic)
+
+    Either way the proposal is validated by the rules-dispose gate. A live LLM that
+    errors out falls through to the heuristic so nothing can block the pipeline.
+    """
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if api_key:
+        result = _llm_triage(event)
+        if result is not None:
+            result["source"] = SRC_LLM
+            return apply_rules_dispose(result, event)
+
+    result = _heuristic_triage(event)
+    result["source"] = SRC_HEURISTIC
     return apply_rules_dispose(result, event)

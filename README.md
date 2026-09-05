@@ -193,10 +193,12 @@ substring heuristic rule, taxonomy-declared-ambiguous, and unmapped generic code
 ever touch the LLM; the clear-cut tail stays deterministic and never pays an LLM call.
 
 - `classifier.py` resolves the two rule buckets by itself (`source=rule`).
-- For ambiguous buckets, `triage.py` consults **Gemini** (`gemini-1.5-flash` via REST,
-  `GEMINI_API_KEY`) — the LLM proposes a **category** (which the policy table turns into
-  a timing/channel strategy) and **drafts the customer recovery message**. Without a
-  key, a deterministic heuristic produces the same-shaped proposal.
+- For ambiguous buckets, `triage.py` follows this two-branch shape:
+  - **If `GEMINI_API_KEY` is set** → call the real LLM (Gemini REST), parse its JSON
+    response: a **category** (which the policy table turns into a timing/channel
+    strategy) plus a **drafted customer recovery message**.
+  - **Else** → a deterministic heuristic picks a *reasonable default action* (category)
+    and returns the **template message** for that action.
 - **Every proposal then passes `apply_rules_dispose()`** — hard rules overrule the AI in
   code: category must be in the allowed set, risk/decline/fraud signals force
   `ambiguous` (human review) no matter what the LLM said, and UPI is never blind
