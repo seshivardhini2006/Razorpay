@@ -1,10 +1,17 @@
 """Failure reason classification.
 
-Three layers, most-trustworthy first:
-  1. EXACT taxonomy match  -> deterministic rule, source=rule   (auditable, never hallucinates)
-  2. SUBSTRING heuristic   -> deterministic rule, source=rule
-  3. AMBIGUOUS tail        -> triage (LLM if keyed, else heuristic), source=llm|heuristic
-                             Low confidence results route to human review, never auto-retry.
+Four output buckets, most-trustworthy first:
+
+  1. RULE — exact match on the failure taxonomy (source=rule)
+  2. RULE — substring heuristic for mapped-but-missing codes (source=rule)
+  3. TRIAGE — codes *declared ambiguous* in the taxonomy (source=llm|heuristic)
+  4. TRIAGE — unmapped generic codes (PAYMENT_FAILED, CARD_DECLINED w/o detail)
+             where context matters (source=llm if GEMINI_API_KEY set, else heuristic)
+
+Bucket 3/4 go through the triage module. There the AI PROPOSES a category/strategy
+and drafts the customer message; deterministic rules DISPOSE (validate/overrule) the
+proposal before it is ever allowed near a retry decision. Low-confidence or
+non-surviving results route to human review, never an automatic retry.
 
 Everything returns a confidence score and a plain-English explanation.
 """
@@ -131,8 +138,10 @@ def _run_triage_path(event, code, hint, note=""):
         explanation=explanation,
         source=judgment["source"],
         raw_code=event.error_code or code,
+        rules_disposed=bool(judgment.get("rules_disposed", False)),
     )
-    # stash the LLM-drafted message on the classification for the recovery agent
+    # stash the AI/heuristic-drafted message on the classification for the recovery agent.
+    # When rules dispose the proposal, the message is cleared so the template wins.
     if msg:
         cls.triage_message = msg
     return cls

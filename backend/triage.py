@@ -1,16 +1,30 @@
-"""Triage for the ambiguous failure tail.
+"""Triage for the genuinely ambiguous failure tail.
 
-Clear-cut failures are handled by the deterministic rule layer. This module exists
-ONLY for genuinely ambiguous codes (generic declines, 'payment_failed', etc.) where
-context — amount, method, bank, history, time-of-day — matters.
+"AI proposes, rules dispose."
 
-- With a `GEMINI_API_KEY` set, calls the Gemini API for a judgment + message draft.
-- Without a key, a deterministic heuristic produces the same-shaped judgment.
-- Either way the output is just a *proposal*: bounds and policies still apply.
+- Clear-cut failures are resolved by the deterministic rule layer and NEVER reach
+  the LLM. That tail is not this module's job.
+- This module handles the ambiguous bucket: generic declines, 'payment_failed',
+  'card_declined' with no bank detail, unmapped codes — where context (amount,
+  method, bank, reason string) matters.
+  - With `GEMINI_API_KEY` set, the LLM (Gemini REST) proposes a category — which
+    maps to a retry strategy via the policy table — AND drafts the customer-facing
+    recovery message.
+  - Without a key, a deterministic heuristic produces the same-shaped proposal.
+- Either way the proposal passes through `apply_rules_dispose()`, which makes hard
+  safety decisions IN CODE regardless of what the AI said:
+    * category must be in the allowed set, else -> ambiguous
+    * risk / decline / fraud signal in the code or reason string overrules any
+      auto-retry proposal -> ambiguous (human review)
+    * UPI is never blind auto-retried -> ambiguous
+  When rules dispose a proposal, the drafted message is discarded too and the
+  deterministic template takes over. Engine + bounds.py enforce the caps/cooldowns
+  on every executed attempt afterwards.
 """
 
 import json
 import os
+import sys
 
 import httpx
 
@@ -18,13 +32,15 @@ from models import SRC_LLM, SRC_HEURISTIC
 
 MODEL = "gemini-1.5-flash"
 
-TRANSFORM_MAP = {
-    "card_declined": "card_declined",
-    "payment_failed": "pin_blocked",
-    "transaction_failed": "pin_blocked",
+ALLOWED_CATEGORIES = {
+    "insufficient_funds", "bank_server_downtime", "otp_timeout",
+    "wrong_cvv_pin", "expired_card", "network_drop", "risk_fraud_block", "ambiguous",
 }
 
-# Deterministic heuristic: context signals -> category, for the no-key path.
+# Deterministic signals that always overrule an AI proposal. Independent of the LLM.
+RISK_SIGNALS = ("declin", "do_not_honor", "refer", "block", "risk", "fraud")
+
+# Heuristic keywords that signal a safe-to-attempt transient failure.
 _SAFE_TO_HANDLE = ("timeout", "unavailable", "gateway", "failed", "connection", "network", "transaction")
 
 
@@ -44,7 +60,7 @@ def _heuristic_triage(event) -> dict:
 
     # Risk-sensitive codes (declines / do-not-honor / referrals) can indicate fraud.
     # Never auto-retry these; route to human review.
-    if any(term in code for term in ("declin", "do_not_honor", "refer", "block", "risk", "fraud")):
+    if any(term in code for term in RISK_SIGNALS):
         return {
             "category": "ambiguous",
             "confidence": 0.5,
@@ -86,19 +102,23 @@ def _heuristic_triage(event) -> dict:
 
 
 def _llm_triage(event) -> dict:
+    """One genuine LLM call for an ambiguous case. Returns None if unavailable."""
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
         return None
 
-    prompt = f"""You are the triage step of a payment-recovery agent. Given a payment that failed with an ambiguous/catch-all error code, decide the most likely recoverable failure category and draft the customer-facing recovery message.
+    prompt = f"""You are the triage step of a payment-recovery agent. Given a payment that failed with an ambiguous/catch-all error code, choose the most likely recoverable failure category — which maps to a retry strategy — and draft the customer-facing recovery message.
 
-Rules:
-- Only choose from: {', '.join(["insufficient_funds","bank_server_downtime","otp_timeout","wrong_cvv_pin","expired_card","network_drop","risk_fraud_block","ambiguous"])}
-- Prefer 'ambiguous' when truly unsure — that escalates to a human, never a blind retry.
-- Never suggest repeated automatic retries for possible risk/fraud.
-- The customer message must be <120 words, warm, plain-language, no error codes, with a clear call to action.
+Strategy vocabulary (a category = a governed strategy; timing/attempt caps are decided separately by our rules, never by you):
+{', '.join(ALLOWED_CATEGORIES)}
 
-Transaction:
+Rules you must follow:
+- Only use the categories above. Prefer 'ambiguous' when truly unsure — that escalates to a human, never a blind retry.
+- Never suggest automatic retries for anything that looks like risk, fraud, a decline, or a 'do not honor' — label those 'risk_fraud_block' or 'ambiguous'.
+- The customer message: <120 words, warm, plain-language, NO error codes, with a clear one-tap call to action.
+- Your answer is a PROPOSAL. Hard safety rules validate it after you. Be conservative, not clever.
+
+Transaction context:
 - amount: Rs {event.amount / 100:.2f}
 - method: {event.payment_method}
 - bank: {event.bank}
@@ -106,7 +126,8 @@ Transaction:
 - reason: {event.reason or 'n/a'}
 - subscription: {event.is_subscription}
 
-Reply with ONLY JSON: {{"category": "...", "confidence": 0.0-1.0, "message": "...", "reasoning": "one line"}}"""
+Reply with ONLY JSON of the shape:
+{{"category": "...", "confidence": 0.0-1.0, "message": "<customer message>", "reasoning": "one line"}}"""
 
     try:
         body = {
@@ -126,33 +147,75 @@ Reply with ONLY JSON: {{"category": "...", "confidence": 0.0-1.0, "message": "..
             text = text.split("\n", 1)[1].rsplit("```", 1)[0]
         data = json.loads(text.strip())
         category = data.get("category", "ambiguous")
-        if category not in {
-            "insufficient_funds", "bank_server_downtime", "otp_timeout",
-            "wrong_cvv_pin", "expired_card", "network_drop", "risk_fraud_block", "ambiguous",
-        }:
-            category = "ambiguous"
         confidence = min(max(float(data.get("confidence", 0.5)), 0.0), 1.0)
         return {
             "category": category,
             "confidence": confidence,
-            "message": data.get("message", ""),
+            "message": str(data.get("message", "")).strip(),
             "explanation": data.get("reasoning", "LLM triage") + " (LLM: " + MODEL + ")",
         }
     except Exception as exc:
-        return {
-            "category": "ambiguous",
-            "confidence": 0.45,
-            "message": "",
-            "explanation": f"LLM triage unavailable ({exc}); conservative ambiguous fallback.",
-        }
+        # An unusable key / network failure must NEVER block the pipeline.
+        print(f"[Reclaim] LLM triage unavailable, using heuristic: {exc}", file=sys.stderr)
+        return None
+
+
+def apply_rules_dispose(proposal: dict, event) -> dict:
+    """Post-processing gate: deterministic safety rules overrule the AI proposal.
+
+    The LLM/heuristic proposes; these rules dispose. Returned dict always has:
+    category (validated), confidence, explanation, message, source, proposed,
+    rules_disposed (bool) and a note when a proposal was overruled.
+    """
+    proposed = proposal.get("category", "ambiguous")
+    category = proposed
+    notes = []
+
+    if category not in ALLOWED_CATEGORIES:
+        category = "ambiguous"
+        notes.append("category outside allowed set")
+
+    code = (event.error_code or "").lower()
+    reason = (event.reason or "").lower()
+    if any(term in code for term in RISK_SIGNALS) or any(term in reason for term in RISK_SIGNALS):
+        if category not in ("ambiguous", "risk_fraud_block"):
+            category = "ambiguous"
+            notes.append("risk/decline signal overrules an auto-retry proposal")
+
+    if (event.payment_method or "").upper() == "UPI":
+        if category != "ambiguous":
+            category = "ambiguous"
+            notes.append("UPI is never blind auto-retried")
+
+    disposed = bool(notes)
+    explanation = proposal.get("explanation", proposal.get("reasoning", "proposal"))
+    if disposed:
+        origin = "LLM" if proposal.get("source") == SRC_LLM else "heuristic"
+        explanation += (
+            f" | {origin} proposed '{proposed}'; RULES DISPOSED -> '{category}' "
+            f"({'; '.join(notes)})."
+        )
+    proposal.update({
+        "category": category,
+        "explanation": explanation,
+        # an overruled message is discarded; the deterministic template takes over
+        "message": proposal.get("message", "") if not disposed else "",
+        "proposed": proposed,
+        "rules_disposed": disposed,
+    })
+    return proposal
 
 
 def triage(event) -> dict:
-    """Return a judgment dict for ambiguous failures. LLM when keyed, else heuristic."""
+    """Return a judgment proposal for an ambiguous failure.
+
+    LLM when keyed (real API call), else deterministic heuristic. Either way the
+    result is validated by the rules-dispose gate before being returned.
+    """
     result = _llm_triage(event)
     if result is not None:
         result["source"] = SRC_LLM
-        return result
-    result = _heuristic_triage(event)
-    result["source"] = SRC_HEURISTIC
-    return result
+    else:
+        result = _heuristic_triage(event)
+        result["source"] = SRC_HEURISTIC
+    return apply_rules_dispose(result, event)

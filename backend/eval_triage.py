@@ -8,14 +8,19 @@ heuristic) and scores each against a 4-check rubric:
   3. REASONING     — an explanation/reasoning line is always produced
   4. MESSAGE_QUALITY — any drafted message is <120 words and has a call to action
 
+Even when an LLM/disposer is bypassed or disagrees, `apply_rules_dispose()` in
+triage.py forces SAFE_ACTION + VALID_CATEGORY in code — that guarantee is checked
+here on every run. Each result also records its source (llm|heuristic) and whether
+the rules disposed the proposal.
+
 Results are written to backend/data/eval_results_TIMESTAMP.json.
 Run with `--heuristic` to force the keyless baseline (no LLM, no keys).
+Run with `--sample N` to also print the proposal detail for one case.
 """
 
 import argparse
 import json
 import os
-import re
 from datetime import datetime
 from pathlib import Path
 
@@ -147,6 +152,8 @@ def evaluate(use_heuristic: bool) -> dict:
             "method": case.payment_method,
             "category": category,
             "confidence": round(confidence, 2),
+            "source": judgment.get("source", ""),
+            "rules_disposed": bool(judgment.get("rules_disposed", False)),
             "reasoning": reasoning[:140],
             "message": message,
             "checks": checks,
@@ -155,13 +162,15 @@ def evaluate(use_heuristic: bool) -> dict:
         })
 
     passed = sum(1 for r in results if r["pass"])
+    llm_used = any(r["source"] == "llm" for r in results)
     summary = {
-        "engine": "heuristic" if use_heuristic else ("llm" if os.environ.get("GEMINI_API_KEY") else "heuristic"),
+        "engine": "llm" if llm_used else "heuristic",
         "timestamp": datetime.utcnow().isoformat(),
         "cases": len(results),
         "passed": passed,
         "pass_rate": round(passed / len(results), 2),
         "checks_pass_rate": round(checks_total["p2"] / checks_total["total"], 2) if checks_total["total"] else 0.0,
+        "rules_disposed": sum(1 for r in results if r["rules_disposed"]),
         "results": results,
     }
     return summary
@@ -170,6 +179,7 @@ def evaluate(use_heuristic: bool) -> dict:
 def main():
     parser = argparse.ArgumentParser(description="Eval guard for Reclaim's triage step.")
     parser.add_argument("--heuristic", action="store_true", help="Force keyless heuristic baseline.")
+    parser.add_argument("--sample", type=int, default=None, help="Print proposal detail for one case index.")
     args = parser.parse_args()
 
     summary = evaluate(args.heuristic)
@@ -182,11 +192,21 @@ def main():
     print(f"cases           : {summary['cases']}")
     print(f"passed          : {summary['passed']} ({summary['pass_rate']:.0%})")
     print(f"checks pass rate: {summary['checks_pass_rate']:.0%}")
+    print(f"rules_disposed  : {summary['rules_disposed']}")
     print(f"wrote          : {out_path}")
     print("--")
     for r in summary["results"]:
         mark = "PASS" if r["pass"] else "FAIL"
-        print(f"[{mark}] {r['code']:<24} -> {r['category']:<20} conf={r['confidence']:.2f}")
+        dispose = " [DISPOSED]" if r["rules_disposed"] else ""
+        print(f"[{mark}] {r['code']:<24} -> {r['category']:<20} {r['source']:<9} conf={r['confidence']:.2f}{dispose}")
+    if args.sample is not None and 0 <= args.sample < len(summary["results"]):
+        r = summary["results"][args.sample]
+        print("--")
+        print(f"sample #{args.sample} ({r['case']}):")
+        print(f"  category : {r['category']}  source={r['source']}  disposed={r['rules_disposed']}")
+        print(f"  reasoning: {r['reasoning']}")
+        if r["message"]:
+            print(f"  message  : {r['message']}")
 
 
 if __name__ == "__main__":

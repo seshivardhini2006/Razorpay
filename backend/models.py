@@ -38,6 +38,7 @@ class ClassificationResult(BaseModel):
     source: str = SRC_RULE
     raw_code: Optional[str] = None
     triage_message: Optional[str] = None  # LLM/heuristic-drafted recovery message for ambiguous cases
+    rules_disposed: bool = False  # True when the deterministic gate overruled the AI proposal
 
 
 class RetryDecision(BaseModel):

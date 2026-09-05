@@ -76,3 +76,34 @@ The CLI demo shares the same module tree as the server. Running it wiped/leaked 
 `backend/reclaim.db` during development. Fix: `db.py` honors `RECLAIM_DB_PATH`, and
 `scripts/demo.py` points it at a temp file and initializes+resets its own schema
 (`db.init_db()` then `db.reset_db()`) before replaying the lifecycle.
+
+---
+
+## 2026-09-05 — unavailable LLM mislabeled as `source=llm`
+
+**Symptom:** when `GEMINI_API_KEY` was set but the call failed (bad key / network),
+`_llm_triage` returned a fallback dict tagged `source=llm`, so the audit trail and
+eval summary claimed an LLM decision that never happened.
+
+**Root cause:** the exception handler returned a proposal instead of deferring to the
+heuristic path; `triage()` only used the heuristic when the LLM path returned `None`.
+
+**Fix:** `_llm_triage` now returns `None` on any exception (and logs one line to
+stderr), so `triage()` falls through to the heuristic. `source` is now always truthful
+(`llm` only when a genuine call succeeded).
+
+---
+
+## 2026-09-05 — "AI proposes, rules dispose" gate added
+
+**Context:** the LLM could propose any category and its message was used verbatim;
+safety lived only at execution/decision time. If an LLM proposed an auto-retry category
+for a risk/UPI case, nothing at the classification boundary pushed back — and the eval
+"safe action" guarantee rested on trusting the model.
+
+**Fix:** `apply_rules_dispose()` now runs on *every* triage output (LLM and heuristic):
+category whitelist clamp, risk/decline/fraud signal override -> ambiguous, UPI ->
+ambiguous, and overruled proposals lose their drafted message. `rules_disposed` is
+carried on the classification for audit/eval visibility. Locked in by tests in
+`tests/test_triage.py` (7 new cases, including a mocked real Gemini call) — suite now
+28/28 passing.

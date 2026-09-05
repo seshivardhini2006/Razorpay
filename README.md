@@ -147,7 +147,7 @@ unlike conventional dunning tools that are reason-blind and channel-generic.
 | **Event Simulator** | Generates realistic synthetic failures (weighted reasons, banks, merchants, subscription/purchase mix); ~8% genuinely ambiguous | `backend/event_generator.py` |
 | **Failure Taxonomy** | Human-curated mapping of documented-style failure codes → categories, labeled by source of truth | `backend/data/razorpay_error_reasons.json` |
 | **Failure Classifier** | 3-layer rules: exact taxonomy → substring heuristic → rule/LLM triage; outputs reason + confidence + explanation + source | `backend/classifier.py` |
-| **Triage Layer** | Opt-in LLM (Gemini) for ambiguous codes with deterministic heuristic fallback; merchant allow-list gate | `backend/triage.py` |
+| **Triage Layer** | Opt-in LLM (Gemini) for ambiguous codes only; drafts category + customer message; hard rules-dispose gate overrules unsafe proposals; heuristic fallback when keyless | `backend/triage.py` |
 | **Retry Decision Engine** | Timing, channel, attempt caps from a configurable policy table; per-merchant overrides; attempt-number awareness | `backend/retry_engine.py`, `backend/policies.py` |
 | **Safety Bounds** | Hard caps (max 4 auto attempts), cooldowns (5-min min), no-retry set, review-required set | `backend/bounds.py` |
 | **Recovery Agent** | Generates personalized, plain-language customer messages from reason-aware templates | `backend/recovery_agent.py` |
@@ -187,24 +187,43 @@ channel) are stored in SQLite and exposed via `GET/PUT /merchants/{id}`.
 
 ## The Triage Layer (LLM + Evals)
 
-Ambiguous codes are the only place where the deterministic classifier is uncertain —
-and the only place an LLM is consulted (never for the clear-cut tail):
+**AI proposes, rules dispose.** The classifier has four buckets — exact taxonomy rule,
+substring heuristic rule, taxonomy-declared-ambiguous, and unmapped generic codes
+(`PAYMENT_FAILED`, `CARD_DECLINED` without detail). Only the **ambiguous buckets**
+ever touch the LLM; the clear-cut tail stays deterministic and never pays an LLM call.
 
-- `classifier.py` resolves clear-cut codes by rules alone (`source=rule`).
-- For ambiguous codes, `triage.py` consults **Gemini** (`gemini-1.5-flash` via REST,
-  `GEMINI_API_KEY`) *only* if a key is set and the merchant is allow-listed; otherwise
-  a deterministic heuristic picks the category (`source=heuristic`).
-- An **eval harness** (`backend/eval_triage.py`) scores the triage path on
-  12 hand-labeled ambiguous cases with a 4-check rubric
-  (safe action, valid category, sound reasoning, actionability of message).
-  The heuristic baseline passes **12/12**.
+- `classifier.py` resolves the two rule buckets by itself (`source=rule`).
+- For ambiguous buckets, `triage.py` consults **Gemini** (`gemini-1.5-flash` via REST,
+  `GEMINI_API_KEY`) — the LLM proposes a **category** (which the policy table turns into
+  a timing/channel strategy) and **drafts the customer recovery message**. Without a
+  key, a deterministic heuristic produces the same-shaped proposal.
+- **Every proposal then passes `apply_rules_dispose()`** — hard rules overrule the AI in
+  code: category must be in the allowed set, risk/decline/fraud signals force
+  `ambiguous` (human review) no matter what the LLM said, and UPI is never blind
+  auto-retried. When rules dispose a proposal, its message draft is discarded too and
+  the deterministic template wins.
+- Bounds (`bounds.py`) and policies are enforced **after** the LLM at decision and
+  execution time, so no AI output can ever bypass an attempt cap or cooldown.
+
+Live one-shot proof (one real LLM call, end to end):
+
+```bash
+$env:GEMINI_API_KEY="your_key"     # then:
+python scripts/probe_llm.py        # proposal -> dispose verdict -> governed decision -> message
+python scripts/probe_llm.py --dry  # wiring only, no network
+```
+
+The eval harness (`backend/eval_triage.py`) scores the triage step on 12 hand-labeled
+ambiguous cases with a 4-check rubric (safe action, valid category, sound reasoning,
+actionable message). The heuristic baseline passes **12/12**, and every run records
+each proposal's `source` plus whether the rules disposed it.
 
 ```bash
 # deterministic baseline, no key needed
 python backend/eval_triage.py --heuristic
 
 # with GEMINI_API_KEY set, scores the live LLM path too
-python backend/eval_triage.py
+python backend/eval_triage.py --sample 0
 ```
 
 ## Human Review Queue
@@ -440,7 +459,8 @@ Razorpay/
 │   ├── tests/                   # pytest suite (classifier, bounds, retry)
 │   └── requirements.txt
 ├── scripts/
-│   └── demo.py                  # Terminal demo of the full recovery lifecycle
+│   ├── demo.py                  # Terminal demo of the full recovery lifecycle
+│   └── probe_llm.py             # One real LLM triage call (proposal -> dispose -> decision)
 ├── frontend/                    # React + Vite + Recharts dashboard
 │   ├── src/
 │   │   ├── App.jsx              # Main dashboard
