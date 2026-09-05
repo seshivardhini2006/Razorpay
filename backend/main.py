@@ -6,6 +6,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+# Load optional .env (repo root/backend) BEFORE db is imported so env-driven
+# settings like RECLAIM_DB_PATH resolve here too. Never overrides real env vars.
+from env_loader import load_env_file
+load_env_file()
+
 import db
 import simclock
 from models import PaymentEvent, MerchantConfig

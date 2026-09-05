@@ -18,6 +18,12 @@ from datetime import timedelta
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "backend"))
 
+# Load optional .env so a populated RAZORPAY_TEST_KEY_ID/_SECRET is used for
+# real test-mode Payment Links. Real env vars still take precedence, and the
+# no-keys cold-start path is untouched (this loader is never called on import).
+from env_loader import load_env_file
+load_env_file()
+
 # Point the engine at a throwaway DB so the demo never touches server data.
 os.environ["RECLAIM_DB_PATH"] = os.path.join(tempfile.gettempdir(), "reclaim_demo_simulated.db")
 

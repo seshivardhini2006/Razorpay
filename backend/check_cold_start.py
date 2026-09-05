@@ -48,6 +48,10 @@ from event_generator import generate_batch
 from engine import ReclaimEngine
 from models import SRC_RULE, SRC_HEURISTIC, SRC_SIM, SRC_HUMAN, SRC_LLM
 
+# Deterministic batch so the proof is reproducible (generate_batch is random).
+import random
+random.seed(20260905)
+
 db.init_db()
 sim = ReclaimEngine()
 
@@ -80,8 +84,9 @@ check("heuristic fallback fired on ambiguous cases", SRC_HEURISTIC in sources)
 check("rule engine tagged clear-cut cases", SRC_RULE in sources)
 check("payment links mocked (source=offline)", links.get("offline", 0) > 0)
 check("no real razorpay link without keys", "razorpay" not in links)
-check("classification rows carry engine source", cls_sources == sorted(set(cls_sources)))
-check("decision rows carry engine source", dec_sources == sorted(set(dec_sources)))
+check("classification rows carry engine source",
+      set(cls_sources) <= {SRC_RULE, SRC_HEURISTIC})
+check("decision rows carry engine source", set(dec_sources) <= {SRC_RULE, SRC_HEURISTIC})
 
 print()
 if not ok:

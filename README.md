@@ -287,9 +287,21 @@ Credentials are **test keys** from
 [`dashboard.razorpay.com` → Settings → API Keys](https://dashboard.razorpay.com/app/keys):
 
 ```bash
+# Option 1 — real environment variables
 $env:RAZORPAY_TEST_KEY_ID="rzp_test_..."
 $env:RAZORPAY_TEST_KEY_SECRET="..."
 ```
+
+```bash
+# Option 2 — .env file (loaded ONLY at app entrypoints: the API in main.py and
+# scripts/demo.py; never on import, so tests/cold-start stay key-free)
+Copy-Item .env.example .env   # then fill in RAZORPAY_TEST_KEY_ID/_SECRET
+```
+
+The loader (`backend/env_loader.py`) is dependency-free and uses `setdefault`, so a
+real environment variable always wins over `.env`; `.env` is gitignored and never
+committed. Nothing auto-loads it during `import`, which preserves the
+[no-keys cold start](#no-api-keys-it-still-runs) proof.
 
 Graceful degradation on three levels (see `backend/razorpay_payments.py`):
 

@@ -215,3 +215,23 @@ one `source=human` attempt scheduled then executed on clock advance; second appr
 refused; dismiss closes cleanly. 6 new tests in `backend/tests/test_review.py`; test DB
 isolation fixed via a shared per-session DB in `conftest.py` (was breaking
 `test_payment_links`). Suite 40/40.
+
+---
+
+## 2026-09-05 — `.env` keys were never read (no loader existed)
+
+**Symptom:** user added Razorpay test keys to `.env`, but the backend only ever read
+`os.environ` — there was no `load_dotenv` anywhere and nothing loaded `.env`, so the
+recovery step kept producing `source=offline` mock links even with keys present.
+
+**Fix:** added a tiny dependency-free loader `backend/env_loader.py`
+(KEY=VALUE / `export` / quotes / comments, `setdefault` semantics). It is called
+**only** at app entrypoints — top of `backend/main.py` (before `import db`, so
+`RECLAIM_DB_PATH` from `.env` also resolves) and `scripts/demo.py` — and **never** on
+plain `import`, so the no-keys cold-start proof (`check_cold_start.py`) stays valid
+even with a populated `.env` on disk. Real env vars always win over `.env`; `.env`
+remains gitignored.
+
+**Verified:** real test-mode Payment Link created via the actual Razorpay API
+(`source=razorpay`, `plink_...`, live `rzp.io` short URL) using the keys from `.env`.
+4 new loader tests. Suite 44/44.
