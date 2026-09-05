@@ -265,13 +265,6 @@ Invoke-RestMethod -Uri "http://localhost:8000/events/generate" `
 
 ---
 
-## Configuring Claude for Personalized Messages
-
-Set the `ANTHROPIC_API_KEY` environment variable before starting the backend. Reclaim
-uses the Anthropic Messages API to write a warm, plain-language SMS-style message per
-failure, adapted to the context (a purchase vs. a subscription renewal). If the call
-fails or no key is set, it uses the reason-aware template generator instead — the demo
-never breaks.
 
 ---
 
